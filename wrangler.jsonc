@@ -1,0 +1,91 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // A SEPARATE Worker from the frontend's `workel-all-service`. Same name would
+  // overwrite the SPA.
+  "name": "workel-mcp-server",
+
+  // Locked deliberately rather than auto-generated, matching frontend/wrangler.jsonc —
+  // an auto-dated value is not reproducible across builds.
+  "compatibility_date": "2026-05-12",
+
+  // Required, not cosmetic: remote.ts uses node:crypto (createHash, for the
+  // hashed-bearer throttle key) and Buffer, and the MCP SDK pulls in more.
+  // Without this the Worker fails at import time, not at request time.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The Workers entry adapts Fetch Request/Response to the same
+  // createRemoteHandler the container runs. Wrangler bundles the TypeScript
+  // directly, so there is no build step here and no dist/ to keep in sync.
+  "main": "src/worker.ts",
+
+  "observability": {
+    "enabled": true
+  },
+
+  // Workers has no filesystem, so src/version.ts cannot read package.json at
+  // runtime the way the Node build does — attempting it throws at MODULE LOAD
+  // and the Worker never boots. This injects the value at bundle time instead.
+  //
+  // MUST equal package.json's "version". A test asserts they match, so this
+  // cannot drift silently — same guard RELEASING.md already applies across
+  // package.json / manifest.json / server.json.
+  "define": {
+    "WORKEL_MCP_VERSION": "\"0.3.0\""
+  },
+
+  "vars": {
+    // Public API v1 ONLY. Never an internal endpoint, never the database —
+    // every request carries its own bearer and authority is decided upstream.
+    "WORKEL_API_BASE_URL": "https://api.workel.com/api/public/v1",
+
+    // Presence of this URL is what puts the server in OAuth mode: it starts
+    // advertising `resource_metadata` on its 401 (Claude's whole discovery
+    // path) and stops pre-filtering bearers to the `wk_` shape, since an OAuth
+    // access token is not wk_-shaped. The `resource` field inside that document
+    // must equal the URL a user types into Claude, byte for byte.
+    "WORKEL_OAUTH_RESOURCE_METADATA_URL": "https://auth.workel.com/.well-known/oauth-protected-resource",
+
+    // Browsers never call this endpoint — Claude reaches it server-to-server —
+    // so the allowlist stays empty. An ABSENT Origin is still accepted (that is
+    // the server-to-server case); only a PRESENT, unlisted one is refused.
+    "WORKEL_ALLOWED_ORIGINS": "",
+
+    // The second half of the double opt-in the stdio server applies: a write
+    // scope on the minted key is necessary but not sufficient, and this is the
+    // sufficient half. Both must hold before a write tool registers.
+    //
+    // Turned on deliberately. It grants no authority the user did not already
+    // approve — the consent screen lists the write scopes separately from the
+    // reads, so anyone who connected has seen and accepted them; the flag only
+    // decides whether tools are OFFERED for authority the key already carries.
+    // The API's own 403 remains the boundary either way.
+    //
+    // Turning it back off is a redeploy, and it takes effect for already-
+    // connected clients on their next tools/list — no reconnect needed, in
+    // either direction.
+    "WORKEL_ENABLE_WRITES": "true"
+  },
+
+  // MUST stay explicitly true. Declaring `routes` flips this to false by
+  // default, which silently takes the workers.dev hostname offline — and that
+  // hostname is what a connected client is pinned to, so the connector starts
+  // 404ing with no other symptom. Learned the hard way: adding a custom-domain
+  // route knocked the live connector out until this was set back.
+  "workers_dev": true,
+
+  // Bound only AFTER a deploy without it succeeded, so workers.dev is already
+  // serving if the zone lookup fails. `custom_domain` lets Cloudflare own the
+  // DNS record and cert; `zone_name` is required because the hostname alone is
+  // not enough for Cloudflare to infer the zone.
+  //
+  // workers_dev above MUST stay true alongside this — declaring routes
+  // otherwise flips it to false and silently takes the workers.dev hostname
+  // offline, which is what a connected client may still be pinned to.
+  "routes": [
+    {
+      "pattern": "mcp.workel.com",
+      "zone_name": "workel.com",
+      "custom_domain": true
+    }
+  ]
+}

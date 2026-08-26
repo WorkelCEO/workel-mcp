@@ -1,0 +1,53 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "com.workel/mcp",
+  "description": "Official Model Context Protocol server for Workel \u2014 a thin, stateless client of the Workel Public API v1. Exposes read-only tools for projects, tasks, task comments, members, and events to any MCP-speaking AI client. Holds no authority beyond what the configured API key's scopes already grant.",
+  "version": "0.3.0",
+  "repository": {
+    "url": "https://github.com/WorkelCEO/workel-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@workel/mcp",
+      "version": "0.3.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "WORKEL_API_KEY",
+          "description": "A Workel API key minted in Workel \u2192 Settings \u2192 Developers. Read only from this environment variable, never from a command-line argument \u2014 those are visible via `ps` to any local user on the machine.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "WORKEL_API_BASE_URL",
+          "description": "Overrides the API host. Defaults to https://api.workel.com/api/public/v1. Must be https://, except http://localhost, http://127.0.0.1, or http://[::1], which are allowed for local development.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "WORKEL_ENABLE_WRITES",
+          "description": "Local operator consent flag for write tools \u2014 not an authorization boundary. No write tool is registered by the server in this release regardless of this value.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "WORKEL_SKIP_STARTUP_CHECK",
+          "description": "Set to true to skip the GET /me startup probe and start immediately with every tool this key's scopes could ever reach, without confirming which scopes the key actually carries right now.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "WORKEL_LOG_LEVEL",
+          "description": "One of debug, info, warn, error (case-insensitive). Defaults to info.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

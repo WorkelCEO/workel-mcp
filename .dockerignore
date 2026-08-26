@@ -1,0 +1,31 @@
+# Mirrors payment-service/.dockerignore — the Dockerfile's `COPY . .` would
+# otherwise drag the developer's local node_modules into the build context.
+# That is slow, and worse: native modules built on a Mac would land in a linux
+# image, where they either fail to load or fail confusingly at runtime. The
+# image installs its own via `npm ci` before this copy, so the local tree is
+# never wanted.
+node_modules
+dist
+
+# Secrets must never enter an image layer.
+.env
+.env.local
+.env.*.local
+
+*.log
+.git
+.gitignore
+.vscode
+.idea
+coverage
+
+# Tests are not shipped. They also import devDependencies that the production
+# stage does not install.
+*.test.ts
+*.spec.ts
+
+# Release artifacts, not runtime inputs.
+manifest.json
+server.json
+RELEASING.md
+README.md

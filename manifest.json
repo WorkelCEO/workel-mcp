@@ -1,0 +1,33 @@
+{
+  "manifest_version": "0.2",
+  "name": "workel-mcp",
+  "display_name": "Workel",
+  "version": "0.3.0",
+  "description": "Official Model Context Protocol server for Workel — a thin client of the Workel Public API v1",
+  "long_description": "Exposes a Workel workspace to MCP-speaking AI clients (Claude, the OpenAI Agents SDK, or any other MCP-speaking client) as a small set of well-scoped, read-only tools covering projects, tasks, task comments, members, and events. Every rule that actually matters — what the configured API key can see, what it can write, how fast it can write it — lives in the Workel API itself; this extension holds no authority the key doesn't already have.",
+  "author": {
+    "name": "Workel"
+  },
+  "homepage": "https://developer.workel.com",
+  "license": "MIT",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "WORKEL_API_KEY": "${user_config.workel_api_key}"
+      }
+    }
+  },
+  "user_config": {
+    "workel_api_key": {
+      "type": "string",
+      "title": "Workel API key",
+      "description": "A Workel API key minted in Workel → Settings → Developers. Grant only the read:* scopes this server's tools use (read:projects, read:tasks, read:members, read:events) — see the package README's tool table for exactly which tool needs which scope. Never reuse a key another integration already holds.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

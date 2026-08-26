@@ -1,0 +1,6 @@
+node_modules/
+dist/
+
+# wrangler local dev state (miniflare cache/sqlite). Was committed by
+# accident once; it is machine-local build output, never source.
+.wrangler/

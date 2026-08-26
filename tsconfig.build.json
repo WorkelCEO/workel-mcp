@@ -1,0 +1,6 @@
+{
+  "//": "Build-only config. The base tsconfig compiles src/**/* including *.test.ts, which meant 108 compiled test files (roughly half the tarball) shipped to users. The published output is production code only; `npm test` and `npm run typecheck` still use the base config so tests are fully type-checked.",
+  "//remote": "src/remote.ts was excluded here while it was unshipped skeleton code. It is now the entry point of the deployed container (Dockerfile CMD is `node dist/remote.js`), so excluding it produced a build that succeeded and an image that crashlooped on a missing file. It compiles here rather than in a second config because the Dockerfile runs plain `npm run build` — a separate script would have to be remembered in two places. The cost is that the npm package carries dist/remote.js, which nothing in the stdio entry imports.",
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}

@@ -1,0 +1,63 @@
+name: CI
+
+# Ported from the monorepo's mcp-server-tests.yml. No path filter here —
+# in a dedicated repo every change is a change to this package.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck, test, pack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci --prefer-offline --no-audit
+      - run: npx tsc --noEmit
+      - run: npm test
+
+      # The published tarball must NOT carry the remote transport: an npx user
+      # can never reach it, and shipping it invites someone to try. The build
+      # still compiles it, because the container's CMD starts dist/remote.js —
+      # those two requirements look opposed and are reconciled by `!dist/remote.*`
+      # in package.json "files". A test asserts that field; this asserts the
+      # actual tarball, because the field being right and the tarball being
+      # right are not the same claim.
+      - name: The tarball excludes the remote transport
+        run: |
+          npm run build
+          files=$(npm pack --dry-run --json | node -e "
+            let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
+              console.log(JSON.parse(s)[0].files.map(f=>f.path).join('\n'));
+            });")
+          echo "$files"
+          if grep -q '^dist/remote\.' <<< "$files"; then
+            echo "::error::dist/remote.* is in the published tarball"
+            exit 1
+          fi
+
+      # The Worker bundle gets its version injected at build time (Workers has
+      # no filesystem to read package.json from), so it is a fourth place a
+      # version can drift. A test covers this too; running it here means a
+      # release that forgets wrangler.jsonc fails before it is tagged.
+      - name: Version is consistent across package.json and wrangler.jsonc
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          wr=$(node -p "
+            const s=require('fs').readFileSync('wrangler.jsonc','utf8');
+            (s.match(/\"WORKEL_MCP_VERSION\"\s*:\s*\"\\\\\"([^\\\\]+)\\\\\"\"/)||[])[1] ?? 'MISSING';
+          ")
+          echo "package.json=$pkg wrangler.jsonc=$wr"
+          [ "$pkg" = "$wr" ] || { echo "::error::version mismatch"; exit 1; }
