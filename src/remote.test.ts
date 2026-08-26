@@ -23,6 +23,16 @@ function jsonResponse(status: number, body: unknown, headers: Record<string, str
   return new Response(JSON.stringify(body), { status, headers });
 }
 
+/**
+ * A single-resource response: the record wrapped in the `{data: ...}` envelope
+ * a Laravel API Resource always emits. `meResponse` is deliberately NOT wrapped
+ * — `/me` is a plain JSON response, not a Resource, and is the one endpoint on
+ * this surface that returns its body bare.
+ */
+function itemResponse(status: number, record: unknown, headers: Record<string, string> = {}): Response {
+  return jsonResponse(status, { data: record }, headers);
+}
+
 function fakeRequest(opts: { method?: string; headers?: Record<string, string>; body?: unknown; url?: string } = {}): RemoteRequest {
   const bodyText = opts.body === undefined ? '' : JSON.stringify(opts.body);
   return {
@@ -428,7 +438,7 @@ describe('createRemoteHandler: end-to-end tool dispatch (mirrors server.test.ts 
   });
 
   it('a gated WRITE tool (workel_create_task) dispatches end-to-end when writesEnabled is true — same success shape as buildServer over stdio', async () => {
-    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireTask()));
+    const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireTask()));
     const { deps } = makeHarness({ writesEnabled: true }, fetchMock);
     const handler = createRemoteHandler(deps);
     const req = fakeRequest({

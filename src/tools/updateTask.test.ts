@@ -8,6 +8,18 @@ function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status });
 }
 
+/**
+ * A single-resource response: the record wrapped in the `{data: ...}` envelope
+ * a Laravel API Resource always emits. Mocking the bare record here instead is
+ * what let the envelope bug ship — the fixtures asserted a shape the API never
+ * sends, so the suite stayed green while `result.data` handed the mapper the
+ * wrapper. Use this for every show/create/update response; `jsonResponse` stays
+ * for list pages (which carry their own `{data, meta}`) and for error bodies.
+ */
+function itemResponse(status: number, record: unknown): Response {
+  return jsonResponse(status, { data: record });
+}
+
 function makeClient(fetchMock: jest.Mock) {
   return createWorkelApiClient({
     baseUrl: BASE_URL,
@@ -96,7 +108,7 @@ describe('workel_update_task', () => {
 
   describe('PATCH body: explicit presence check, never spread-with-undefineds', () => {
     it('omits every field that was not given, and includes exactly the fields that were', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask({})));
       const descriptor = workelUpdateTask(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_9', priority: 'high' });
@@ -110,7 +122,7 @@ describe('workel_update_task', () => {
     });
 
     it('sends an explicit null as null (clearing a field), not as an absent key', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask({})));
       const descriptor = workelUpdateTask(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_9', due_date: null });
@@ -121,7 +133,7 @@ describe('workel_update_task', () => {
     });
 
     it('an empty call body (id only) sends an empty PATCH body', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask({})));
       const descriptor = workelUpdateTask(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_9' });
@@ -149,7 +161,7 @@ describe('workel_update_task', () => {
   });
 
   it('renames title -> title_text, due_date -> end_date, due_time -> end_time on the wire', async () => {
-    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+    const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask({})));
     const descriptor = workelUpdateTask(makeClient(fetchMock));
 
     await descriptor.handler({ id: 't_9', title: 'New title', due_date: '2026-07-01', due_time: '09:00' });
@@ -164,7 +176,7 @@ describe('workel_update_task', () => {
   });
 
   it('requests PATCH /tasks/{id} with the id in the path', async () => {
-    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+    const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask({})));
     const descriptor = workelUpdateTask(makeClient(fetchMock));
 
     await descriptor.handler({ id: 't_9', priority: 'low' });
@@ -175,7 +187,7 @@ describe('workel_update_task', () => {
   });
 
   it('never sends an Idempotency-Key header (PATCH has no idempotency key)', async () => {
-    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+    const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask({})));
     const descriptor = workelUpdateTask(makeClient(fetchMock));
 
     await descriptor.handler({ id: 't_9', priority: 'low' });
@@ -187,7 +199,7 @@ describe('workel_update_task', () => {
 
   it('maps the updated task back (card -> column, plus derived column_id)', async () => {
     const fetchMock = jest.fn().mockResolvedValue(
-      jsonResponse(200, wireTask({ card: { id: 'c_2', name: 'Done', is_done: true } }))
+      itemResponse(200, wireTask({ card: { id: 'c_2', name: 'Done', is_done: true } }))
     );
     const descriptor = workelUpdateTask(makeClient(fetchMock));
 
@@ -234,7 +246,7 @@ describe('workel_update_task', () => {
 
   describe('board move and assignee replacement reach the wire under their server-side names', () => {
     it('sends column_id as card_id', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask({})));
       const descriptor = workelUpdateTask(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_9', column_id: 'col_done' });
@@ -245,7 +257,7 @@ describe('workel_update_task', () => {
     });
 
     it('sends assignee_ids as user_ids, and forwards an empty array rather than dropping it', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask({})));
       const descriptor = workelUpdateTask(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_9', assignee_ids: [] });
@@ -257,7 +269,7 @@ describe('workel_update_task', () => {
     });
 
     it('omits both when neither was given', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask({})));
       const descriptor = workelUpdateTask(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_9', title: 'Renamed' });

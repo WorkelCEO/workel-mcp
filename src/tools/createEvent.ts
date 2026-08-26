@@ -60,7 +60,7 @@
  */
 
 import { z } from 'zod';
-import type { WireEvent } from '../api/types';
+import type { WireEvent, WireItem } from '../api/types';
 import { mapCreateEventToWire, mapEventFromWire, type CreateEventInput } from '../api/mapping';
 import { defineTool, type ToolFactory, type ToolResult } from './defineTool';
 import { UNTRUSTED_CONTENT_NOTE, jsonToolResult } from './conventions';
@@ -181,10 +181,10 @@ export const workelCreateEvent: ToolFactory = (client) =>
       }
 
       const wireBody = mapCreateEventToWire(input as unknown as CreateEventInput);
-      const result = await client.post<WireEvent>('/events', wireBody, {
+      const result = await client.post<WireItem<WireEvent>>('/events', wireBody, {
         idempotencyKey: input.idempotency_key,
       });
-      const event = mapEventFromWire(result.data);
+      const event = mapEventFromWire(result.data.data);
 
       return jsonToolResult({ ...event, replayed: result.replayed ?? false });
     },

@@ -16,7 +16,7 @@
  */
 
 import { z } from 'zod';
-import type { WireCursorPage, WireProject } from '../api/types';
+import type { WireCursorPage, WireItem, WireProject } from '../api/types';
 import { mapProjectFromWire } from '../api/mapping';
 import { listEnvelope, omitLongText, truncateText } from '../output';
 import { defineTool, type ToolFactory } from './defineTool';
@@ -71,8 +71,8 @@ export const workelGetProject: ToolFactory = (client) =>
     scope: SCOPE,
     handler: async (args) => {
       const { id } = args as { id: string };
-      const result = await client.get<WireProject>(`/projects/${encodeURIComponent(id)}`);
-      const project = mapProjectFromWire(result.data);
+      const result = await client.get<WireItem<WireProject>>(`/projects/${encodeURIComponent(id)}`);
+      const project = mapProjectFromWire(result.data.data);
       return jsonToolResult({
         ...project,
         description: project.description === null ? null : truncateText(project.description),

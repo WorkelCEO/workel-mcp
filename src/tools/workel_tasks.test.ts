@@ -8,6 +8,18 @@ function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status });
 }
 
+/**
+ * A single-resource response: the record wrapped in the `{data: ...}` envelope
+ * a Laravel API Resource always emits. Mocking the bare record here instead is
+ * what let the envelope bug ship — the fixtures asserted a shape the API never
+ * sends, so the suite stayed green while `result.data` handed the mapper the
+ * wrapper. Use this for every show/create/update response; `jsonResponse` stays
+ * for list pages (which carry their own `{data, meta}`) and for error bodies.
+ */
+function itemResponse(status: number, record: unknown): Response {
+  return jsonResponse(status, { data: record });
+}
+
 function makeClient(fetchMock: jest.Mock) {
   return createWorkelApiClient({
     baseUrl: BASE_URL,
@@ -160,7 +172,7 @@ describe('workel_get_task', () => {
       created_at: null,
       updated_at: null,
     };
-    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask));
+    const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask));
     const descriptor = workelGetTask(makeClient(fetchMock));
 
     const parsed = z.object(descriptor.inputSchema).parse({ id: 't_9' });
@@ -199,7 +211,7 @@ describe('workel_get_task', () => {
       created_at: null,
       updated_at: null,
     };
-    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask));
+    const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask));
     const descriptor = workelGetTask(makeClient(fetchMock));
 
     const result = await descriptor.handler({ id: 't_9' });
@@ -236,7 +248,7 @@ describe('workel_get_task', () => {
       created_at: null,
       updated_at: null,
     };
-    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask));
+    const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask));
     const descriptor = workelGetTask(makeClient(fetchMock));
 
     const result = await descriptor.handler({ id: 't_9' });
@@ -265,7 +277,7 @@ describe('workel_get_task', () => {
       created_at: null,
       updated_at: null,
     };
-    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask));
+    const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask));
     const descriptor = workelGetTask(makeClient(fetchMock));
 
     const result = await descriptor.handler({ id: 't_9' });
@@ -292,7 +304,7 @@ describe('workel_get_task', () => {
       created_at: null,
       updated_at: null,
     };
-    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask));
+    const fetchMock = jest.fn().mockResolvedValue(itemResponse(200, wireTask));
     const descriptor = workelGetTask(makeClient(fetchMock));
 
     const result = await descriptor.handler({ id: 't_9' });

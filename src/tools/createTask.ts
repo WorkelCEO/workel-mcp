@@ -50,7 +50,7 @@
  */
 
 import { z } from 'zod';
-import type { WireTask } from '../api/types';
+import type { WireItem, WireTask } from '../api/types';
 import { mapCreateTaskToWire, mapTaskFromWire, type CreateTaskInput } from '../api/mapping';
 import { defineTool, type ToolFactory, type ToolResult } from './defineTool';
 import { UNTRUSTED_CONTENT_NOTE, jsonToolResult } from './conventions';
@@ -155,10 +155,10 @@ export const workelCreateTask: ToolFactory = (client) =>
       // checks (`../api/mapping.ts`) — an extra key is never copied onto the
       // wire body, so no stripping step is needed before this call.
       const wireBody = mapCreateTaskToWire(input as unknown as CreateTaskInput);
-      const result = await client.post<WireTask>('/tasks', wireBody, {
+      const result = await client.post<WireItem<WireTask>>('/tasks', wireBody, {
         idempotencyKey: input.idempotency_key,
       });
-      const task = mapTaskFromWire(result.data);
+      const task = mapTaskFromWire(result.data.data);
 
       return jsonToolResult({ ...task, replayed: result.replayed ?? false });
     },

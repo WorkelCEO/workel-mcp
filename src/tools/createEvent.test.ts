@@ -13,6 +13,18 @@ function jsonResponse(status: number, body: unknown, headers: Record<string, str
   return new Response(payload, { status, headers });
 }
 
+/**
+ * A single-resource response: the record wrapped in the `{data: ...}` envelope
+ * a Laravel API Resource always emits. Mocking the bare record here instead is
+ * what let the envelope bug ship — the fixtures asserted a shape the API never
+ * sends, so the suite stayed green while `result.data` handed the mapper the
+ * wrapper. Use this for every show/create/update response; `jsonResponse` stays
+ * for list pages (which carry their own `{data, meta}`) and for error bodies.
+ */
+function itemResponse(status: number, record: unknown, headers: Record<string, string> = {}): Response {
+  return jsonResponse(status, { data: record }, headers);
+}
+
 function makeClient(fetchMock: jest.Mock) {
   return createWorkelApiClient({
     baseUrl: BASE_URL,
@@ -99,7 +111,7 @@ describe('workel_create_event', () => {
 
   describe('repeat defaulting and the repeat_interval cross-field rejection', () => {
     it('defaults repeat to "none" on the wire when omitted entirely', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireEvent({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireEvent({})));
       const descriptor = workelCreateEvent(makeClient(fetchMock));
 
       const parsed = parseArgs(descriptor, { ...REQUIRED_FIELDS });
@@ -123,7 +135,7 @@ describe('workel_create_event', () => {
     });
 
     it('accepts repeat: "none" with no repeat_interval — fetch is called', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireEvent({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireEvent({})));
       const descriptor = workelCreateEvent(makeClient(fetchMock));
 
       const parsed = parseArgs(descriptor, { ...REQUIRED_FIELDS, repeat: 'none' });
@@ -134,7 +146,7 @@ describe('workel_create_event', () => {
     });
 
     it('accepts repeat: "weekly" WITH a repeat_interval — fetch is called and both fields reach the wire', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireEvent({ repeat: 'weekly' })));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireEvent({ repeat: 'weekly' })));
       const descriptor = workelCreateEvent(makeClient(fetchMock));
 
       const parsed = parseArgs(descriptor, { ...REQUIRED_FIELDS, repeat: 'weekly', repeat_interval: 2 });
@@ -179,7 +191,7 @@ describe('workel_create_event', () => {
 
   describe('wire mapping', () => {
     it('requests POST /events', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireEvent({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireEvent({})));
       const descriptor = workelCreateEvent(makeClient(fetchMock));
 
       const parsed = parseArgs(descriptor, { ...REQUIRED_FIELDS });
@@ -191,7 +203,7 @@ describe('workel_create_event', () => {
     });
 
     it('does not rename title (unlike a task) and maps invited_user_ids -> invited_users, dropping the tool-vocab key', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireEvent({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireEvent({})));
       const descriptor = workelCreateEvent(makeClient(fetchMock));
 
       const parsed = parseArgs(descriptor, {
@@ -208,7 +220,7 @@ describe('workel_create_event', () => {
     });
 
     it('omits optional fields entirely when not given, rather than sending them as null/undefined', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireEvent({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireEvent({})));
       const descriptor = workelCreateEvent(makeClient(fetchMock));
 
       const parsed = parseArgs(descriptor, { ...REQUIRED_FIELDS });
@@ -233,7 +245,7 @@ describe('workel_create_event', () => {
     });
 
     it('never sends idempotency_key onto the wire body itself', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireEvent({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireEvent({})));
       const descriptor = workelCreateEvent(makeClient(fetchMock));
 
       const parsed = parseArgs(descriptor, { ...REQUIRED_FIELDS, idempotency_key: 'caller-key-1' });
@@ -244,7 +256,7 @@ describe('workel_create_event', () => {
     });
 
     it('forwards a caller-supplied idempotency_key verbatim as the Idempotency-Key header', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireEvent({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireEvent({})));
       const descriptor = workelCreateEvent(makeClient(fetchMock));
 
       const parsed = parseArgs(descriptor, { ...REQUIRED_FIELDS, idempotency_key: 'caller-key-1' });
@@ -274,7 +286,7 @@ describe('workel_create_event', () => {
 
   describe('response mapping', () => {
     it('maps the created event and reports replayed: false for a fresh create', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireEvent({ id: 'e_9', title: 'Retro' })));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireEvent({ id: 'e_9', title: 'Retro' })));
       const descriptor = workelCreateEvent(makeClient(fetchMock));
 
       const parsed = parseArgs(descriptor, { ...REQUIRED_FIELDS, title: 'Retro' });
@@ -289,7 +301,7 @@ describe('workel_create_event', () => {
     it('reports replayed: true when the server marks the response as an idempotency replay', async () => {
       const fetchMock = jest
         .fn()
-        .mockResolvedValue(jsonResponse(201, wireEvent({}), { 'Idempotent-Replay': 'true' }));
+        .mockResolvedValue(itemResponse(201, wireEvent({}), { 'Idempotent-Replay': 'true' }));
       const descriptor = workelCreateEvent(makeClient(fetchMock));
 
       const parsed = parseArgs(descriptor, { ...REQUIRED_FIELDS, idempotency_key: 'caller-key-1' });

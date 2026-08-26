@@ -8,6 +8,18 @@ function jsonResponse(status: number, body: unknown, headers: Record<string, str
   return new Response(payload, { status, headers });
 }
 
+/**
+ * A single-resource response: the record wrapped in the `{data: ...}` envelope
+ * a Laravel API Resource always emits. Mocking the bare record here instead is
+ * what let the envelope bug ship — the fixtures asserted a shape the API never
+ * sends, so the suite stayed green while `result.data` handed the mapper the
+ * wrapper. Use this for every show/create/update response; `jsonResponse` stays
+ * for list pages (which carry their own `{data, meta}`) and for error bodies.
+ */
+function itemResponse(status: number, record: unknown, headers: Record<string, string> = {}): Response {
+  return jsonResponse(status, { data: record }, headers);
+}
+
 function makeClient(fetchMock: jest.Mock) {
   return createWorkelApiClient({
     baseUrl: BASE_URL,
@@ -107,7 +119,7 @@ describe('workel_create_task', () => {
     });
 
     it('does NOT reject due_date given without due_time (only the reverse is ambiguous)', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireTask({})));
       const descriptor = workelCreateTask(makeClient(fetchMock));
 
       const result = await descriptor.handler({ title: 'x', project_id: 'p_1', due_date: '2026-06-01' });
@@ -119,7 +131,7 @@ describe('workel_create_task', () => {
     it('does NOT reject column_id given alone, or project_id given alone', async () => {
       // A fresh Response per call — a single Response's body can only be
       // read once, and this test makes two handler calls against one mock.
-      const fetchMock = jest.fn().mockImplementation(() => Promise.resolve(jsonResponse(201, wireTask({}))));
+      const fetchMock = jest.fn().mockImplementation(() => Promise.resolve(itemResponse(201, wireTask({}))));
       const descriptor = workelCreateTask(makeClient(fetchMock));
 
       await descriptor.handler({ title: 'x', column_id: 'c_1' });
@@ -171,7 +183,7 @@ describe('workel_create_task', () => {
 
   describe('wire mapping', () => {
     it('requests POST /tasks', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireTask({})));
       const descriptor = workelCreateTask(makeClient(fetchMock));
 
       await descriptor.handler({ title: 'x', project_id: 'p_1' });
@@ -182,7 +194,7 @@ describe('workel_create_task', () => {
     });
 
     it('maps title->title_text, column_id->card_id, assignee_ids->user_ids, and drops every tool-vocab key from the wire body', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireTask({})));
       const descriptor = workelCreateTask(makeClient(fetchMock));
 
       await descriptor.handler({
@@ -212,7 +224,7 @@ describe('workel_create_task', () => {
     });
 
     it('omits fields entirely when not given, rather than sending them as null/undefined', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireTask({})));
       const descriptor = workelCreateTask(makeClient(fetchMock));
 
       await descriptor.handler({ title: 'x', project_id: 'p_1' });
@@ -224,7 +236,7 @@ describe('workel_create_task', () => {
     });
 
     it('never sends idempotency_key onto the wire body itself', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireTask({})));
       const descriptor = workelCreateTask(makeClient(fetchMock));
 
       await descriptor.handler({ title: 'x', project_id: 'p_1', idempotency_key: 'caller-key-1' });
@@ -237,7 +249,7 @@ describe('workel_create_task', () => {
   describe('response mapping', () => {
     it('maps the created task (card -> column, plus derived column_id) and reports replayed: false for a fresh create', async () => {
       const fetchMock = jest.fn().mockResolvedValue(
-        jsonResponse(
+        itemResponse(
           201,
           wireTask({
             card: { id: 'c_1', name: 'In Progress', is_done: false },
@@ -257,7 +269,7 @@ describe('workel_create_task', () => {
     it('reports replayed: true when the server marks the response as an idempotency replay', async () => {
       const fetchMock = jest
         .fn()
-        .mockResolvedValue(jsonResponse(201, wireTask({}), { 'Idempotent-Replay': 'true' }));
+        .mockResolvedValue(itemResponse(201, wireTask({}), { 'Idempotent-Replay': 'true' }));
       const descriptor = workelCreateTask(makeClient(fetchMock));
 
       const result = await descriptor.handler({ title: 'x', project_id: 'p_1', idempotency_key: 'caller-key-1' });
@@ -267,7 +279,7 @@ describe('workel_create_task', () => {
     });
 
     it('forwards a caller-supplied idempotency_key verbatim as the Idempotency-Key header', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireTask({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireTask({})));
       const descriptor = workelCreateTask(makeClient(fetchMock));
 
       await descriptor.handler({ title: 'x', project_id: 'p_1', idempotency_key: 'caller-key-1' });

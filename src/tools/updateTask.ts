@@ -64,7 +64,7 @@
  */
 
 import { z } from 'zod';
-import type { WireTask } from '../api/types';
+import type { WireItem, WireTask } from '../api/types';
 import { mapUpdateTaskToWire, mapTaskFromWire, type UpdateTaskInput } from '../api/mapping';
 import { defineTool, type ToolFactory } from './defineTool';
 import { UNTRUSTED_CONTENT_NOTE, jsonToolResult } from './conventions';
@@ -148,8 +148,8 @@ export const workelUpdateTask: ToolFactory = (client) =>
       if (hasOwn(args, 'assignee_ids')) updateInput.assignee_ids = typedArgs.assignee_ids;
 
       const wireBody = mapUpdateTaskToWire(updateInput);
-      const result = await client.patch<WireTask>(`/tasks/${encodeURIComponent(id)}`, wireBody);
-      const task = mapTaskFromWire(result.data);
+      const result = await client.patch<WireItem<WireTask>>(`/tasks/${encodeURIComponent(id)}`, wireBody);
+      const task = mapTaskFromWire(result.data.data);
 
       return jsonToolResult(task);
     },

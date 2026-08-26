@@ -335,3 +335,30 @@ export interface WireCursorPage<T> {
     next_cursor: string | null;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Single-resource envelope
+//
+// The sibling of `WireCursorPage` for endpoints that return ONE record rather
+// than a page: `{data: {...}}`, with no `meta`. Every single-object endpoint on
+// this surface wraps its record this way — a `show()` response and the body a
+// `store()`/`update()` echoes back alike — because they are all Laravel API
+// Resources, and a Resource always wraps.
+//
+// This type exists to make that wrapping impossible to forget. Declaring a
+// handler's response as the bare `Wire*` type instead type-checks perfectly
+// while handing the envelope to the mapper, which then reads every field off
+// the wrapper and finds nothing: `workel_get_task` threw
+// "Cannot read properties of undefined (reading 'length')" on the absent
+// `description`, and `workel_update_task` reported `column_id: null` for a
+// board move that had in fact succeeded. Both were invisible to the suite
+// because the fixtures mocked a bare record rather than a wrapped one.
+//
+// `workel_whoami` is the one endpoint that does NOT wrap — it is a plain JSON
+// response, not a Resource — so it correctly reads `result.data` directly.
+// spec: Laravel `JsonResource` / `$wrap = 'data'`
+// ---------------------------------------------------------------------------
+
+export interface WireItem<T> {
+  data: T;
+}

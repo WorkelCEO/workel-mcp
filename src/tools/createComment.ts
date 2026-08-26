@@ -49,7 +49,7 @@
  */
 
 import { z } from 'zod';
-import type { WireTaskComment } from '../api/types';
+import type { WireItem, WireTaskComment } from '../api/types';
 import { mapCreateCommentToWire, mapTaskCommentFromWire } from '../api/mapping';
 import { defineTool, type ToolFactory } from './defineTool';
 import { UNTRUSTED_CONTENT_NOTE, jsonToolResult } from './conventions';
@@ -101,12 +101,12 @@ export const workelCreateTaskComment: ToolFactory = (client) =>
       // mapCreateCommentToWire itself does internally — see the file-level
       // docblock for why that matters specifically for this endpoint.
       const wireBody = mapCreateCommentToWire({ body: input.body });
-      const result = await client.post<WireTaskComment>(
+      const result = await client.post<WireItem<WireTaskComment>>(
         `/tasks/${encodeURIComponent(input.id)}/comments`,
         wireBody,
         { idempotencyKey: input.idempotency_key }
       );
-      const comment = mapTaskCommentFromWire(result.data);
+      const comment = mapTaskCommentFromWire(result.data.data);
 
       return jsonToolResult({ ...comment, replayed: result.replayed ?? false });
     },

@@ -10,6 +10,18 @@ function jsonResponse(status: number, body: unknown, headers: Record<string, str
   return new Response(payload, { status, headers });
 }
 
+/**
+ * A single-resource response: the record wrapped in the `{data: ...}` envelope
+ * a Laravel API Resource always emits. Mocking the bare record here instead is
+ * what let the envelope bug ship — the fixtures asserted a shape the API never
+ * sends, so the suite stayed green while `result.data` handed the mapper the
+ * wrapper. Use this for every show/create/update response; `jsonResponse` stays
+ * for list pages (which carry their own `{data, meta}`) and for error bodies.
+ */
+function itemResponse(status: number, record: unknown, headers: Record<string, string> = {}): Response {
+  return jsonResponse(status, { data: record }, headers);
+}
+
 function makeClient(fetchMock: jest.Mock) {
   return createWorkelApiClient({
     baseUrl: BASE_URL,
@@ -75,7 +87,7 @@ describe('workel_create_task_comment', () => {
 
   describe('mention_user_ids never reaches the wire', () => {
     it('the wire body key set carries no key matching /mention/i for an ordinary call', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireComment({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireComment({})));
       const descriptor = workelCreateTaskComment(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_1', body: 'A plain comment.' });
@@ -87,7 +99,7 @@ describe('workel_create_task_comment', () => {
     });
 
     it('still carries no mention-shaped key when the caller forces mention_user_ids onto the args object', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireComment({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireComment({})));
       const descriptor = workelCreateTaskComment(makeClient(fetchMock));
 
       // T10's write-tool schemas are plain `z.object(...)` (no `.strict()`)
@@ -113,7 +125,7 @@ describe('workel_create_task_comment', () => {
 
   describe('wire mapping', () => {
     it('requests POST /tasks/{id}/comments', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireComment({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireComment({})));
       const descriptor = workelCreateTaskComment(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_42', body: 'hello' });
@@ -124,7 +136,7 @@ describe('workel_create_task_comment', () => {
     });
 
     it('URL-encodes the task id into the path', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireComment({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireComment({})));
       const descriptor = workelCreateTaskComment(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't/weird id', body: 'hello' });
@@ -134,7 +146,7 @@ describe('workel_create_task_comment', () => {
     });
 
     it('sends body unrenamed and nothing else', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireComment({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireComment({})));
       const descriptor = workelCreateTaskComment(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_1', body: 'Ship it.' });
@@ -144,7 +156,7 @@ describe('workel_create_task_comment', () => {
     });
 
     it('never sends idempotency_key onto the wire body itself', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireComment({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireComment({})));
       const descriptor = workelCreateTaskComment(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_1', body: 'hi', idempotency_key: 'caller-key-1' });
@@ -154,7 +166,7 @@ describe('workel_create_task_comment', () => {
     });
 
     it('forwards a caller-supplied idempotency_key verbatim as the Idempotency-Key header', async () => {
-      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(201, wireComment({})));
+      const fetchMock = jest.fn().mockResolvedValue(itemResponse(201, wireComment({})));
       const descriptor = workelCreateTaskComment(makeClient(fetchMock));
 
       await descriptor.handler({ id: 't_1', body: 'hi', idempotency_key: 'caller-key-1' });
@@ -168,7 +180,7 @@ describe('workel_create_task_comment', () => {
   describe('response mapping', () => {
     it('maps the created comment and reports replayed: false for a fresh create', async () => {
       const fetchMock = jest.fn().mockResolvedValue(
-        jsonResponse(201, wireComment({ id: 'tc_9', body: 'Ship it.', author: { id: 'u_2', name: 'Grace' } }))
+        itemResponse(201, wireComment({ id: 'tc_9', body: 'Ship it.', author: { id: 'u_2', name: 'Grace' } }))
       );
       const descriptor = workelCreateTaskComment(makeClient(fetchMock));
 
@@ -184,7 +196,7 @@ describe('workel_create_task_comment', () => {
     it('reports replayed: true when the server marks the response as an idempotency replay', async () => {
       const fetchMock = jest
         .fn()
-        .mockResolvedValue(jsonResponse(201, wireComment({}), { 'Idempotent-Replay': 'true' }));
+        .mockResolvedValue(itemResponse(201, wireComment({}), { 'Idempotent-Replay': 'true' }));
       const descriptor = workelCreateTaskComment(makeClient(fetchMock));
 
       const result = await descriptor.handler({ id: 't_1', body: 'hi', idempotency_key: 'caller-key-1' });
