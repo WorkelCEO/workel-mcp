@@ -29,6 +29,12 @@ Authorizing requires owner or admin on the workspace you choose, and the
 connection is re-checked on every request, so losing that role disconnects it
 without anyone having to remember to revoke a key.
 
+It can read your projects, tasks, comments, events and members, and it can
+create tasks, comments and events and update existing tasks. It cannot delete
+anything, and it cannot move a task between projects. Read and write
+permissions are listed separately on the consent screen, so you approve them
+knowingly rather than discovering them later.
+
 This package is for the cases the hosted server doesn't cover: **Claude Code,
 CI agents, the OpenAI Agents SDK** — anywhere you want to run the process
 yourself and hold the credential. Everything below is about that.
@@ -123,7 +129,7 @@ default — because a doctor run is exactly the moment a tampered
 
 ## Tools
 
-This release registers the following read-only tools. `workel_whoami` needs
+This release registers the following read tools. `workel_whoami` needs
 no scope at all and works with any valid key; every other tool is only
 registered when the key's scopes (discovered via the `GET /me` probe above)
 include the scope listed. List tools return 25 results per call by default
@@ -141,15 +147,25 @@ include the scope listed. List tools return 25 results per call by default
 | `workel_list_members` | `read:members` | List the workspace's active members — the only tool that returns email addresses. |
 | `workel_list_events` | `read:events` | List events on the workspace and any of its visible projects. |
 
-**Write tools are not yet available in this release.** `workel_create_task`,
-`workel_update_task`, `workel_create_task_comment`, and `workel_create_event`
-exist in this package's source, gated behind the `write:tasks` /
-`write:comments` / `write:events` scopes and `WORKEL_ENABLE_WRITES` exactly
-as described in the security note above — but the server does not currently
-register any of them at boot, regardless of a key's scopes or that flag's
-value. Treat the write-tool guidance above as this project's intended
-design, not something you can rely on today; a future release note will say
-when that changes.
+### Write tools
+
+Four, and they register only when **both** gates pass: the key carries the
+matching `write:*` scope **and** `WORKEL_ENABLE_WRITES=true` is set. Either
+one alone registers nothing, so a read-only install never sees them.
+
+| Tool | Scope | What it does |
+|---|---|---|
+| `workel_create_task` | `write:tasks` | Create a task, placed by either `column_id` or `project_id` — exactly one, never both. |
+| `workel_update_task` | `write:tasks` | Update fields on an existing task. Cannot move it between columns or projects, and cannot change assignees. |
+| `workel_create_task_comment` | `write:comments` | Add a plain-text comment to a task. No @-mentions; the API rejects the request outright if a mention field is sent. |
+| `workel_create_event` | `write:events` | Create a calendar event. `repeat_interval` is required whenever `repeat` is anything but `none`. |
+
+No tool deletes anything. `workel_update_task` is annotated
+`destructiveHint: true`, so a client that honours annotations prompts before
+each call; the read tools are annotated read-only and run without one.
+
+The hosted server at `mcp.workel.com` runs with writes enabled, so all
+thirteen tools are available there.
 
 ## Limitations
 
