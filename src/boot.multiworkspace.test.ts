@@ -77,7 +77,7 @@ describe('write tools reach the shipped server', () => {
         'workel_create_event',
       ])
     );
-    expect(result?.toolNames).toHaveLength(13);
+    expect(result?.toolNames).toHaveLength(14);
   });
 
   it('withholds them when the flag is absent, even though the key carries write scopes', async () => {
@@ -86,7 +86,7 @@ describe('write tools reach the shipped server', () => {
     const result = await boot(deps);
 
     // Gate (b) of the double opt-in: scopes alone must never be enough.
-    expect(result?.toolNames).toHaveLength(9);
+    expect(result?.toolNames).toHaveLength(10);
     expect(result?.toolNames).not.toContain('workel_create_task');
   });
 
@@ -99,7 +99,7 @@ describe('write tools reach the shipped server', () => {
     const result = await boot(deps);
 
     // Gate (a): the flag is local consent, the key's scopes are the authority.
-    expect(result?.toolNames).toHaveLength(9);
+    expect(result?.toolNames).toHaveLength(10);
   });
 });
 
@@ -128,8 +128,8 @@ describe('several workspaces from one server', () => {
 
     const result = await boot(deps);
 
-    // Three workspaces, still nine tools — the context cost does not scale.
-    expect(result?.toolNames).toHaveLength(9);
+    // Three workspaces, still ten tools — the context cost does not scale.
+    expect(result?.toolNames).toHaveLength(10);
   });
 
   it('de-duplicates a key repeated across both env vars', async () => {

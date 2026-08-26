@@ -171,6 +171,110 @@ describe('workel_get_task', () => {
     expect(url.search).toBe('');
   });
 
+  it('surfaces the cover image and attachments, each attachment reduced to id/name/url/type/size/uploader/created_at', async () => {
+    const wireTask = {
+      id: 't_9',
+      title: 'Do the thing',
+      description: null,
+      project_id: 'p_1',
+      card: null,
+      priority: null,
+      due_date: null,
+      due_time: null,
+      progress: null,
+      completed: false,
+      assignee_ids: [],
+      cover_image: { url: 'https://cdn.test/covers/a.png', name: 'a.png', type: 'image/png', size: 2048 },
+      attachments: [
+        {
+          id: 'att_1',
+          name: 'spec.pdf',
+          url: 'https://cdn.test/attachments/spec.pdf',
+          type: 'application/pdf',
+          size: 4096,
+          uploaded_by: { id: 'u_1', name: 'Ada' },
+          created_at: '2026-08-26T10:00:00+00:00',
+        },
+      ],
+      created_at: null,
+      updated_at: null,
+    };
+    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask));
+    const descriptor = workelGetTask(makeClient(fetchMock));
+
+    const result = await descriptor.handler({ id: 't_9' });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(parsed.cover_image).toEqual({
+      url: 'https://cdn.test/covers/a.png',
+      name: 'a.png',
+      type: 'image/png',
+      size: 2048,
+    });
+    expect(parsed.attachments).toHaveLength(1);
+    expect(Object.keys(parsed.attachments[0]).sort()).toEqual(
+      ['created_at', 'id', 'name', 'size', 'type', 'uploaded_by', 'url'].sort()
+    );
+    expect(parsed.attachments[0].uploaded_by).toEqual({ id: 'u_1', name: 'Ada' });
+  });
+
+  it('reports an absent cover as null and an empty attachment list as [], distinguishing "none" from "not reported"', async () => {
+    const wireTask = {
+      id: 't_9',
+      title: 'Do the thing',
+      description: null,
+      project_id: 'p_1',
+      card: null,
+      priority: null,
+      due_date: null,
+      due_time: null,
+      progress: null,
+      completed: false,
+      assignee_ids: [],
+      cover_image: null,
+      attachments: [],
+      created_at: null,
+      updated_at: null,
+    };
+    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask));
+    const descriptor = workelGetTask(makeClient(fetchMock));
+
+    const result = await descriptor.handler({ id: 't_9' });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(parsed.cover_image).toBeNull();
+    expect(parsed.attachments).toEqual([]);
+  });
+
+  it('omits both keys entirely when the server did not report them, rather than inventing a null', async () => {
+    // The listing does not carry cover_image/attachments. An explicit null
+    // there would read as "this task has none", which is a different claim
+    // from "this view does not report them" — so the keys must be absent.
+    const wireTask = {
+      id: 't_9',
+      title: 'Do the thing',
+      description: null,
+      project_id: 'p_1',
+      card: null,
+      priority: null,
+      due_date: null,
+      due_time: null,
+      progress: null,
+      completed: false,
+      assignee_ids: [],
+      created_at: null,
+      updated_at: null,
+    };
+    const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask));
+    const descriptor = workelGetTask(makeClient(fetchMock));
+
+    const result = await descriptor.handler({ id: 't_9' });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(Object.prototype.hasOwnProperty.call(parsed, 'cover_image')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(parsed, 'attachments')).toBe(false);
+  });
+
   it('truncates a long description and derives column/column_id as null when there is no card', async () => {
     const longDescription = 'y'.repeat(9000);
     const wireTask = {

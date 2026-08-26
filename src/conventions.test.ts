@@ -32,6 +32,7 @@ const EXPECTED_NAMES = [
   'workel_list_tasks',
   'workel_get_task',
   'workel_list_task_comments',
+  'workel_list_task_activity',
   'workel_list_events',
 ];
 
@@ -44,10 +45,11 @@ const EXPECTED_SCOPES: Record<string, string | undefined> = {
   workel_list_tasks: 'read:tasks',
   workel_get_task: 'read:tasks',
   workel_list_task_comments: 'read:tasks',
+  workel_list_task_activity: 'read:tasks',
   workel_list_events: 'read:events',
 };
 
-describe('the registry is exactly the nine planned read tools', () => {
+describe('the registry is exactly the ten planned read tools', () => {
   it('has the exact name set the plan calls for — no more, no fewer, none renamed', () => {
     const names = registry().map((d) => d.name);
 
@@ -55,8 +57,8 @@ describe('the registry is exactly the nine planned read tools', () => {
     expect(names).toHaveLength(EXPECTED_NAMES.length);
   });
 
-  it('has exactly nine entries — a smuggled-in tenth tool (write or otherwise) fails this', () => {
-    expect(registry()).toHaveLength(9);
+  it('has exactly ten entries — a smuggled-in eleventh tool (write or otherwise) fails this', () => {
+    expect(registry()).toHaveLength(10);
   });
 
   it('every tool name starts with workel_', () => {

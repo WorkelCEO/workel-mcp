@@ -29,11 +29,13 @@ Authorizing requires owner or admin on the workspace you choose, and the
 connection is re-checked on every request, so losing that role disconnects it
 without anyone having to remember to revoke a key.
 
-It can read your projects, tasks, comments, events and members, and it can
-create tasks, comments and events and update existing tasks. It cannot delete
-anything, and it cannot move a task between projects. Read and write
-permissions are listed separately on the consent screen, so you approve them
-knowingly rather than discovering them later.
+It can read your projects, tasks, comments, events and members — including a
+task's cover image, attachments and full history — and it can create tasks,
+comments and events, and update existing tasks: renaming them, changing dates
+and priority, moving them between columns and projects, and changing who they
+are assigned to. It cannot delete anything, and it cannot upload files. Read
+and write permissions are listed separately on the consent screen, so you
+approve them knowingly rather than discovering them later.
 
 ### Connecting more than one workspace
 
@@ -58,7 +60,7 @@ yourself and hold the credential. Everything below is about that.
 It handles multiple workspaces differently, and better for this use case: set
 [`WORKEL_API_KEYS`](#environment-variables) to a comma-separated list, one key per
 workspace, and every tool gains a `workspace` argument naming which one to act
-in. Nine tools stay nine tools however many workspaces you configure, rather
+in. Ten tools stay ten tools however many workspaces you configure, rather
 than multiplying per workspace — which matters because every tool definition is
 context the model pays for on each turn.
 
@@ -165,8 +167,9 @@ include the scope listed. List tools return 25 results per call by default
 | `workel_get_project` | `read:projects` | Fetch one project by id, including its full (possibly truncated) description. |
 | `workel_list_project_columns` | `read:projects` | List a project's board columns — its kanban lists such as "To Do" or "Done" — not the tasks inside them. |
 | `workel_list_tasks` | `read:tasks` | List tasks, filterable by project, column, completion, and due-date/update-time. There is no text search on this endpoint. |
-| `workel_get_task` | `read:tasks` | Fetch one task by id, including its full (possibly truncated) description. |
+| `workel_get_task` | `read:tasks` | Fetch one task by id — the full detail view: description, cover image, and attachments (each with a download url, size, and uploader). |
 | `workel_list_task_comments` | `read:tasks` | List every comment on a task — top-level comments and replies together. Order is unspecified; sort by `created_at`. |
+| `workel_list_task_activity` | `read:tasks` | List a task's history, newest first — who did what to it and when. `action` is human prose, not an enum. |
 | `workel_list_members` | `read:members` | List the workspace's active members — the only tool that returns email addresses. |
 | `workel_list_events` | `read:events` | List events on the workspace and any of its visible projects. |
 
@@ -179,7 +182,7 @@ one alone registers nothing, so a read-only install never sees them.
 | Tool | Scope | What it does |
 |---|---|---|
 | `workel_create_task` | `write:tasks` | Create a task, placed by either `column_id` or `project_id` — exactly one, never both. |
-| `workel_update_task` | `write:tasks` | Update fields on an existing task. Cannot move it between columns or projects, and cannot change assignees. |
+| `workel_update_task` | `write:tasks` | Update fields on an existing task, including moving it to another column (`column_id`, which may belong to a different project) and reassigning it (`assignee_ids`, which **replaces** the set rather than adding to it). Cover image and attachments are readable but not writable — they are file uploads. |
 | `workel_create_task_comment` | `write:comments` | Add a plain-text comment to a task. No @-mentions; the API rejects the request outright if a mention field is sent. |
 | `workel_create_event` | `write:events` | Create a calendar event. `repeat_interval` is required whenever `repeat` is anything but `none`. |
 

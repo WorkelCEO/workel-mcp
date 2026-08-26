@@ -67,21 +67,24 @@ describe('workel_update_task', () => {
     });
   });
 
-  it('input schema excludes reminder_date, card_id, column_id, project_id, and every assignee field', () => {
+  it('input schema excludes reminder_date, project_id, and the raw wire names', () => {
     const descriptor = workelUpdateTask(makeClient(jest.fn()));
     const keys = Object.keys(descriptor.inputSchema);
 
-    for (const forbidden of ['reminder_date', 'card_id', 'column_id', 'project_id', 'user_ids', 'assignee_ids']) {
+    // `card_id`/`user_ids` are the WIRE names — the tool speaks column_id /
+    // assignee_ids and the rename lives only in mapping.ts. `project_id` has
+    // no tool-side spelling at all: a task's project follows its column.
+    for (const forbidden of ['reminder_date', 'card_id', 'project_id', 'user_ids']) {
       expect(keys).not.toContain(forbidden);
     }
   });
 
-  it('input schema is exactly id + the six updatable fields', () => {
+  it('input schema is exactly id + the eight updatable fields', () => {
     const descriptor = workelUpdateTask(makeClient(jest.fn()));
     const keys = Object.keys(descriptor.inputSchema).sort();
 
     expect(keys).toEqual(
-      ['description', 'due_date', 'due_time', 'id', 'priority', 'progress', 'title'].sort()
+      ['assignee_ids', 'column_id', 'description', 'due_date', 'due_time', 'id', 'priority', 'progress', 'title'].sort()
     );
   });
 
@@ -211,11 +214,59 @@ describe('workel_update_task', () => {
     });
   });
 
-  it('description states this tool cannot move columns/projects or change assignees', () => {
+  it('description states that it CAN move a task and reassign it, and that assignees are replaced not appended', () => {
     const descriptor = workelUpdateTask(makeClient(jest.fn()));
 
-    expect(descriptor.description).toContain('CANNOT move');
-    expect(descriptor.description).toContain('CANNOT change its assignees');
+    expect(descriptor.description).toContain('MOVING it to a different column');
+    expect(descriptor.description).toContain('REASSIGNING it');
+    // The append-vs-replace distinction is the one a model gets wrong
+    // silently — it drops assignees instead of erroring — so the description
+    // must say it outright.
+    expect(descriptor.description).toContain('REPLACES the assignee set');
+  });
+
+  it('description states that cover image and attachments are readable but not writable here', () => {
+    const descriptor = workelUpdateTask(makeClient(jest.fn()));
+
+    expect(descriptor.description).toContain('cover image and attachments are readable');
+    expect(descriptor.description).toContain('cannot be set here');
+  });
+
+  describe('board move and assignee replacement reach the wire under their server-side names', () => {
+    it('sends column_id as card_id', async () => {
+      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+      const descriptor = workelUpdateTask(makeClient(fetchMock));
+
+      await descriptor.handler({ id: 't_9', column_id: 'col_done' });
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+      expect(body).toEqual({ card_id: 'col_done' });
+      expect(body).not.toHaveProperty('column_id');
+    });
+
+    it('sends assignee_ids as user_ids, and forwards an empty array rather than dropping it', async () => {
+      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+      const descriptor = workelUpdateTask(makeClient(fetchMock));
+
+      await descriptor.handler({ id: 't_9', assignee_ids: [] });
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+      // [] means "clear every assignee" — dropping it would silently turn a
+      // deliberate clear into a no-op.
+      expect(body).toEqual({ user_ids: [] });
+    });
+
+    it('omits both when neither was given', async () => {
+      const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, wireTask({})));
+      const descriptor = workelUpdateTask(makeClient(fetchMock));
+
+      await descriptor.handler({ id: 't_9', title: 'Renamed' });
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+      expect(body).toEqual({ title_text: 'Renamed' });
+      expect(body).not.toHaveProperty('card_id');
+      expect(body).not.toHaveProperty('user_ids');
+    });
   });
 
   it('description states the cross-project write capability: any task in any visible project, regardless of the key creator\'s project membership', () => {

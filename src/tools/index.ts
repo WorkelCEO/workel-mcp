@@ -18,6 +18,7 @@ import { workelListProjectColumns } from './workel_project_columns';
 import { workelListMembers } from './workel_members';
 import { workelListTasks, workelGetTask } from './workel_tasks';
 import { workelListTaskComments } from './workel_task_comments';
+import { workelListTaskActivity } from './workel_task_activity';
 import { workelListEvents } from './workel_events';
 
 export const READ_TOOLS: ToolFactory[] = [
@@ -29,6 +30,7 @@ export const READ_TOOLS: ToolFactory[] = [
   workelListTasks,
   workelGetTask,
   workelListTaskComments,
+  workelListTaskActivity,
   workelListEvents,
 ];
 

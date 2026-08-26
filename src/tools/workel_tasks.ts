@@ -36,13 +36,19 @@ const LIST_DESCRIPTION =
   'neither), while updated_since is INCLUSIVE (`>=` — a task updated at exactly that instant IS ' +
   'returned). There is no text search on this endpoint — no title or description keyword filter ' +
   "exists; narrow by project_id/column_id/completed/dates instead, or fetch a page and read the " +
-  "titles. Each task's `description` is omitted from this list view (call workel_get_task for the " +
-  'full description of one task); every other field is present. Paginated via an opaque `cursor`; a ' +
+  "titles. Each task's `description` is omitted from this list view, and so are its cover image and " +
+  'attachments (call workel_get_task for those); every other field is present. Paginated via an ' +
+  'opaque `cursor`; a ' +
   '`null` next_cursor means there are no more pages. ' +
   UNTRUSTED_CONTENT_NOTE;
 
 const GET_DESCRIPTION =
-  'Fetch a single task by id, including its full (possibly truncated) description. A task id that ' +
+  'Fetch a single task by id — the full detail view. Includes everything the list view carries plus ' +
+  'the full (possibly truncated) description, the task\'s cover image (cover_image, null when it has ' +
+  'none), and its attachments (each with a downloadable url, size, and who uploaded it). For the ' +
+  "task's history — who changed what and when — call workel_list_task_activity; for its discussion, " +
+  'workel_list_task_comments. Cover image and attachments are read-only through this API: both are ' +
+  'file uploads, so no tool can set them. A task id that ' +
   "does not exist, or that exists but isn't visible to this API key (its project is archived, " +
   'private, the inbox project, or in a different workspace), returns the same not-found result ' +
   'either way — this tool cannot be used to tell those cases apart. ' +

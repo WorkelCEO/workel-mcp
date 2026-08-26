@@ -12,7 +12,7 @@ import type { FetchLike } from './api/client';
 
 const API_KEY = 'wk_test_boot_key_0123456789';
 const ALL_READ_SCOPES = ['read:projects', 'read:tasks', 'read:members', 'read:events'];
-const ALL_NINE_TOOLS = [
+const ALL_TEN_TOOLS = [
   'workel_whoami',
   'workel_list_projects',
   'workel_get_project',
@@ -20,6 +20,7 @@ const ALL_NINE_TOOLS = [
   'workel_list_tasks',
   'workel_get_task',
   'workel_list_task_comments',
+  'workel_list_task_activity',
   'workel_list_members',
   'workel_list_events',
 ].sort();
@@ -134,7 +135,7 @@ describe('boot: happy path', () => {
     expect(exit).not.toHaveBeenCalled();
     expect(result).toBeDefined();
     expect(result!.server).toBeInstanceOf(McpServer);
-    expect(result!.toolNames.sort()).toEqual(ALL_NINE_TOOLS);
+    expect(result!.toolNames.sort()).toEqual(ALL_TEN_TOOLS);
 
     expect(stderr).toHaveBeenCalledTimes(1);
     const line = stderr.mock.calls[0][0] as string;
@@ -148,7 +149,7 @@ describe('boot: happy path', () => {
     for (const scope of ALL_READ_SCOPES) {
       expect(line).toContain(scope);
     }
-    for (const name of ALL_NINE_TOOLS) {
+    for (const name of ALL_TEN_TOOLS) {
       expect(line).toContain(name);
     }
     expect(stdout).not.toHaveBeenCalled();
@@ -165,22 +166,22 @@ describe('boot: scope-gated tool registration', () => {
     expect(result!.toolNames.sort()).toEqual(
       ['workel_whoami', 'workel_list_projects', 'workel_get_project', 'workel_list_project_columns'].sort()
     );
-    for (const absent of ['workel_list_tasks', 'workel_get_task', 'workel_list_task_comments', 'workel_list_members', 'workel_list_events']) {
+    for (const absent of ['workel_list_tasks', 'workel_get_task', 'workel_list_task_comments', 'workel_list_task_activity', 'workel_list_members', 'workel_list_events']) {
       expect(result!.toolNames).not.toContain(absent);
     }
     expect(stdout).not.toHaveBeenCalled();
   });
 
-  it('registers all nine tools when the key carries all four read scopes', async () => {
+  it('registers all ten tools when the key carries all four read scopes', async () => {
     const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, meResponseBody({ scopes: ALL_READ_SCOPES })));
     const { deps } = makeHarness({ WORKEL_API_KEY: API_KEY }, fetchMock);
 
     const result = await boot(deps);
 
-    expect(result!.toolNames.sort()).toEqual(ALL_NINE_TOOLS);
+    expect(result!.toolNames.sort()).toEqual(ALL_TEN_TOOLS);
   });
 
-  it('still registers exactly nine tools when the key ALSO carries write:tasks — there is no write tool to register yet', async () => {
+  it('still registers exactly ten tools when the key ALSO carries write:tasks — a write scope alone registers no write tool', async () => {
     const fetchMock = jest
       .fn()
       .mockResolvedValue(jsonResponse(200, meResponseBody({ scopes: [...ALL_READ_SCOPES, 'write:tasks'] })));
@@ -188,7 +189,7 @@ describe('boot: scope-gated tool registration', () => {
 
     const result = await boot(deps);
 
-    expect(result!.toolNames.sort()).toEqual(ALL_NINE_TOOLS);
+    expect(result!.toolNames.sort()).toEqual(ALL_TEN_TOOLS);
   });
 
   it('registers only workel_whoami when the key carries no scopes at all', async () => {
@@ -229,7 +230,7 @@ describe('boot: base URL is reported only when non-default', () => {
 });
 
 describe('boot: WORKEL_SKIP_STARTUP_CHECK', () => {
-  it('never calls fetch, registers all nine tools, and states that scopes were not probed', async () => {
+  it('never calls fetch, registers all ten tools, and states that scopes were not probed', async () => {
     const fetchMock = jest.fn().mockRejectedValue(new Error('fetch must not be called when the check is skipped'));
     const { deps, stdout, stderr, exit } = makeHarness(
       { WORKEL_API_KEY: API_KEY, WORKEL_SKIP_STARTUP_CHECK: 'true' },
@@ -240,7 +241,7 @@ describe('boot: WORKEL_SKIP_STARTUP_CHECK', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(exit).not.toHaveBeenCalled();
-    expect(result!.toolNames.sort()).toEqual(ALL_NINE_TOOLS);
+    expect(result!.toolNames.sort()).toEqual(ALL_TEN_TOOLS);
     expect(stderr).toHaveBeenCalledTimes(1);
     const line = stderr.mock.calls[0][0] as string;
     expectExactlyOneLine(line);

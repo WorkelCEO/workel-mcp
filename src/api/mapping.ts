@@ -33,6 +33,9 @@
 
 import type {
   Column,
+  TaskActivity,
+  TaskAttachment,
+  TaskCover,
   Event,
   Member,
   Project,
@@ -41,6 +44,9 @@ import type {
   TaskComment,
   TaskCommentAuthor,
   WireCard,
+  WireTaskActivity,
+  WireTaskAttachment,
+  WireTaskCover,
   WireEvent,
   WireMember,
   WireProject,
@@ -126,6 +132,8 @@ export interface UpdateTaskInput {
   progress?: number | null;
   due_date?: string | null;
   due_time?: string | null;
+  column_id?: string;
+  assignee_ids?: string[];
 }
 
 export interface WireUpdateTaskRequest {
@@ -135,6 +143,8 @@ export interface WireUpdateTaskRequest {
   progress?: number | null;
   end_date?: string | null;
   end_time?: string | null;
+  card_id?: string;
+  user_ids?: string[];
   // The wire endpoint accepts `reminder_date` (nullable date-time) — this
   // mapper never sets it. See the file-level docblock for why.
   reminder_date?: string | null;
@@ -149,6 +159,12 @@ export function mapUpdateTaskToWire(input: UpdateTaskInput): WireUpdateTaskReque
   if (hasOwn(input, 'progress')) wire.progress = input.progress;
   if (hasOwn(input, 'due_date')) wire.end_date = input.due_date;
   if (hasOwn(input, 'due_time')) wire.end_time = input.due_time;
+  // Board move + assignee replacement. `column_id -> card_id` is the same
+  // rename `mapCreateTaskToWire` performs, and `assignee_ids -> user_ids`
+  // matches its `user_ids` too — the two write mappers must agree on these
+  // names or a move works on create and silently no-ops on update.
+  if (hasOwn(input, 'column_id')) wire.card_id = input.column_id;
+  if (hasOwn(input, 'assignee_ids')) wire.user_ids = input.assignee_ids;
 
   return wire;
 }
@@ -280,6 +296,38 @@ export function mapColumnFromWire(card: WireCard): Column {
  * key on the wire response is silently dropped rather than leaking through,
  * and so the literal key `card` can never appear anywhere in the output.
  */
+export function mapTaskCoverFromWire(cover: WireTaskCover): TaskCover {
+  return {
+    url: cover.url,
+    name: cover.name,
+    type: cover.type,
+    size: cover.size,
+  };
+}
+
+export function mapTaskAttachmentFromWire(attachment: WireTaskAttachment): TaskAttachment {
+  return {
+    id: attachment.id,
+    name: attachment.name,
+    url: attachment.url,
+    type: attachment.type,
+    size: attachment.size,
+    uploaded_by: attachment.uploaded_by
+      ? { id: attachment.uploaded_by.id, name: attachment.uploaded_by.name }
+      : null,
+    created_at: attachment.created_at,
+  };
+}
+
+export function mapTaskActivityFromWire(row: WireTaskActivity): TaskActivity {
+  return {
+    id: row.id,
+    action: row.action,
+    actor: row.actor ? { id: row.actor.id, name: row.actor.name } : null,
+    occurred_at: row.occurred_at,
+  };
+}
+
 export function mapTaskFromWire(task: WireTask): Task {
   const column = task.card ? mapColumnFromWire(task.card) : null;
 
@@ -296,6 +344,16 @@ export function mapTaskFromWire(task: WireTask): Task {
     progress: task.progress,
     completed: task.completed,
     assignee_ids: task.assignee_ids,
+    // Detail-only fields. `undefined` (the listing) is passed through as
+    // undefined so the key is dropped from JSON output entirely, rather than
+    // appearing as an explicit null that would read as "this task has no
+    // attachments" when the truth is "this view does not report them".
+    ...(task.cover_image !== undefined
+      ? { cover_image: task.cover_image ? mapTaskCoverFromWire(task.cover_image) : null }
+      : {}),
+    ...(task.attachments !== undefined
+      ? { attachments: task.attachments.map(mapTaskAttachmentFromWire) }
+      : {}),
     created_at: task.created_at,
     updated_at: task.updated_at,
   };

@@ -325,7 +325,7 @@ describe('workel_create_event', () => {
   });
 });
 
-describe('the full tool registry — read + write — is exactly the planned 13 tools', () => {
+describe('the full tool registry — read + write — is exactly the planned 14 tools', () => {
   const EXPECTED_NAMES = [
     'workel_whoami',
     'workel_list_projects',
@@ -335,6 +335,7 @@ describe('the full tool registry — read + write — is exactly the planned 13 
     'workel_list_tasks',
     'workel_get_task',
     'workel_list_task_comments',
+    'workel_list_task_activity',
     'workel_list_events',
     'workel_create_task',
     'workel_update_task',
@@ -342,11 +343,11 @@ describe('the full tool registry — read + write — is exactly the planned 13 
     'workel_create_event',
   ];
 
-  it('has the exact 13 names, no more, no fewer', () => {
+  it('has the exact 14 names, no more, no fewer', () => {
     const client = makeClient(jest.fn());
     const allNames = [...READ_TOOLS, ...WRITE_TOOLS].map((factory) => factory(client).name);
 
     expect(new Set(allNames)).toEqual(new Set(EXPECTED_NAMES));
-    expect(allNames).toHaveLength(13);
+    expect(allNames).toHaveLength(14);
   });
 });

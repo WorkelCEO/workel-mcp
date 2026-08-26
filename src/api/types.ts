@@ -132,6 +132,33 @@ export interface Member {
 // backend/services/laravel-backend/app/Http/Resources/PublicApi/V1/TaskResource.php:43-66
 // ---------------------------------------------------------------------------
 
+/**
+ * A task's cover image, or null when it has none. Read-only over this API:
+ * covers are created by file upload, so there is no way to SET one from a
+ * tool call — only to see the one that exists.
+ */
+export interface WireTaskCover {
+  url: string | null;
+  name: string | null;
+  type: string | null;
+  size: number | null;
+}
+
+export interface WireTaskAttachmentUploader {
+  id: string;
+  name: string;
+}
+
+export interface WireTaskAttachment {
+  id: string;
+  name: string | null;
+  url: string | null;
+  type: string | null;
+  size: number | null;
+  uploaded_by: WireTaskAttachmentUploader | null;
+  created_at: string | null;
+}
+
 export interface WireTask {
   id: string;
   title: string;
@@ -144,8 +171,54 @@ export interface WireTask {
   progress: number | null;
   completed: boolean;
   assignee_ids: string[];
+  // Present on GET /tasks/{id} and the PATCH response; ABSENT from the
+  // listing, which omits both so a page of tasks costs no extra queries.
+  cover_image?: WireTaskCover | null;
+  attachments?: WireTaskAttachment[];
   created_at: string | null;
   updated_at: string | null;
+}
+
+/**
+ * One row of a task's history. `action` is human-readable prose ("created a
+ * new task", "updated progress", "commented on", suffixed " via API" when the
+ * change came through this API) — deliberately NOT an enum, so never branch
+ * on its exact text.
+ */
+export interface WireTaskActivity {
+  id: string;
+  action: string | null;
+  actor: WireTaskAttachmentUploader | null;
+  occurred_at: string | null;
+}
+
+export interface TaskCover {
+  url: string | null;
+  name: string | null;
+  type: string | null;
+  size: number | null;
+}
+
+export interface TaskAttachmentUploader {
+  id: string;
+  name: string;
+}
+
+export interface TaskAttachment {
+  id: string;
+  name: string | null;
+  url: string | null;
+  type: string | null;
+  size: number | null;
+  uploaded_by: TaskAttachmentUploader | null;
+  created_at: string | null;
+}
+
+export interface TaskActivity {
+  id: string;
+  action: string | null;
+  actor: TaskAttachmentUploader | null;
+  occurred_at: string | null;
 }
 
 export interface Task {
@@ -161,6 +234,10 @@ export interface Task {
   progress: number | null;
   completed: boolean;
   assignee_ids: string[];
+  // Detail-only, mirroring the wire shape: undefined on a listed task,
+  // present (possibly null / empty) on a fetched one.
+  cover_image?: TaskCover | null;
+  attachments?: TaskAttachment[];
   created_at: string | null;
   updated_at: string | null;
 }

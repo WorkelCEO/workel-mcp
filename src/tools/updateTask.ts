@@ -20,12 +20,26 @@
  * `due_time` -> `end_time`) happens ONLY in `../api/mapping.ts`'s
  * `mapUpdateTaskToWire` — never re-implemented here.
  *
- * This tool CANNOT move a task between columns or projects, and CANNOT
- * change its assignees: `card_id`, `project_id`, and `user_ids` are not
- * declared by `UpdatePublicTaskRequest::rules()` at all, so there is no wire
- * field to forward them through even if this tool's input schema offered
- * them — moving/reassigning a task is a different endpoint's job, not yet
- * exposed as a tool. `reminder_date` is likewise never exposed here even
+ * Board moves and assignee changes ARE supported (`column_id` -> `card_id`,
+ * `assignee_ids` -> `user_ids`). An earlier revision of this file said the
+ * opposite, and it was true then: `UpdatePublicTaskRequest::rules()` did not
+ * declare either field, so there was no wire field to forward them through.
+ * Both are now accepted and server-validated — the target column must sit in
+ * a project the key can see, and every assignee must be a member of the key's
+ * workspace.
+ *
+ * `assignee_ids` is REPLACEMENT, not append: the given array becomes the
+ * assignee set, `[]` clears it, and omitting the key leaves it untouched. It
+ * is deliberately NOT nullable in the tool schema — `null` and `[]` would
+ * mean the same thing to the server, and offering two spellings of "clear"
+ * invites a model to guess. `column_id` is likewise non-nullable: a task
+ * always belongs to a column, and the server rejects a null with 422.
+ *
+ * `project_id` is still not exposed: a task's project follows its column, so
+ * `column_id` alone says where the task should live, and a `project_id` that
+ * disagreed with `column_id` would have no coherent meaning.
+ *
+ * `reminder_date` is likewise never exposed here even
  * though the wire endpoint accepts it — see `../api/mapping.ts`'s
  * file-level docblock (it is write-only over this API; there is no read
  * endpoint that ever returns it, so exposing a field a caller can set but
@@ -60,11 +74,16 @@ const SCOPE = 'write:tasks';
 const PRIORITY_VALUES = ['low', 'medium', 'high', 'urgent', 'none'] as const;
 
 const DESCRIPTION =
-  'Update fields on an existing task by id. Every field is optional: an OMITTED field is left ' +
+  'Update fields on an existing task by id, including MOVING it to a different column (column_id) ' +
+  'and REASSIGNING it (assignee_ids). Every field is optional: an OMITTED field is left ' +
   'unchanged; a field EXPLICITLY set to null clears it (e.g. due_date: null clears the due date, ' +
-  'which also clears due_time if it was set — a time cannot outlive its day). This tool CANNOT move ' +
-  'a task to a different column or project, and CANNOT change its assignees — those are not accepted ' +
-  'by this endpoint at all; there is currently no tool for either. IMPORTANT: a write:tasks API key ' +
+  'which also clears due_time if it was set — a time cannot outlive its day). column_id moves the ' +
+  'task to that column, which may belong to a DIFFERENT project — the task lands at the end of the ' +
+  'destination column; get valid ids from workel_list_project_columns. assignee_ids REPLACES the ' +
+  'assignee set rather than adding to it, so pass the complete list you want (send [] to clear all ' +
+  'assignees, or omit the field to leave assignees alone) — read the current set from ' +
+  'workel_get_task first if you mean to add someone. A cover image and attachments are readable ' +
+  'via workel_get_task but cannot be set here: both are file uploads, not values. IMPORTANT: a write:tasks API key ' +
   'can update ANY task in ANY project visible to its workspace, regardless of whether the key\'s ' +
   "creator is actually a member of that specific project — this endpoint performs no per-project " +
   'permission check the way task CREATION does. Treat this tool as workspace-wide for existing ' +
@@ -79,6 +98,8 @@ interface UpdateTaskArgs {
   progress?: number | null;
   due_date?: string | null;
   due_time?: string | null;
+  column_id?: string;
+  assignee_ids?: string[];
 }
 
 function hasOwn(obj: object, key: string): boolean {
@@ -97,6 +118,9 @@ export const workelUpdateTask: ToolFactory = (client) =>
       progress: z.number().int().nullable().optional(),
       due_date: z.string().nullable().optional(),
       due_time: z.string().nullable().optional(),
+      // Non-nullable on purpose — see the file-level docblock.
+      column_id: z.string().min(1).optional(),
+      assignee_ids: z.array(z.string().min(1)).optional(),
     },
     annotations: {
       title: 'Update task',
@@ -120,6 +144,8 @@ export const workelUpdateTask: ToolFactory = (client) =>
       if (hasOwn(args, 'progress')) updateInput.progress = typedArgs.progress;
       if (hasOwn(args, 'due_date')) updateInput.due_date = typedArgs.due_date;
       if (hasOwn(args, 'due_time')) updateInput.due_time = typedArgs.due_time;
+      if (hasOwn(args, 'column_id')) updateInput.column_id = typedArgs.column_id;
+      if (hasOwn(args, 'assignee_ids')) updateInput.assignee_ids = typedArgs.assignee_ids;
 
       const wireBody = mapUpdateTaskToWire(updateInput);
       const result = await client.patch<WireTask>(`/tasks/${encodeURIComponent(id)}`, wireBody);
