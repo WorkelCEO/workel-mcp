@@ -103,10 +103,10 @@ Two things worth understanding before touching the flags described below:
 ## Install
 
 ```
-npx -y @workel/mcp@0.3.0
+npx -y @workel/mcp@0.4.0
 ```
 
-Pin the version — `0.3.0` above is this package's current release; check
+Pin the version — `0.4.0` above is this package's current release; check
 `npm view @workel/mcp version` for the latest one before you pin it. The
 unpinned form below is **convenience only**, fine for a one-off manual try,
 not for anything an agent's config runs unattended:
@@ -128,7 +128,7 @@ npx -y @workel/mcp
 
 ## `doctor`
 
-Run `npx -y @workel/mcp@0.3.0 doctor` any time your MCP client reports only
+Run `npx -y @workel/mcp@0.4.0 doctor` any time your MCP client reports only
 "server failed to start" with no further detail. It runs the exact same
 startup check the server itself runs — load config, then probe `GET /me` —
 and prints a plain-text report to stdout instead of trying to speak the MCP

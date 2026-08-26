@@ -30,7 +30,7 @@
   // cannot drift silently — same guard RELEASING.md already applies across
   // package.json / manifest.json / server.json.
   "define": {
-    "WORKEL_MCP_VERSION": "\"0.3.0\""
+    "WORKEL_MCP_VERSION": "\"0.4.0\""
   },
 
   "vars": {
