@@ -35,9 +35,32 @@ anything, and it cannot move a task between projects. Read and write
 permissions are listed separately on the consent screen, so you approve them
 knowingly rather than discovering them later.
 
+### Connecting more than one workspace
+
+One connection covers one workspace, because the credential behind it is bound
+to that workspace. To reach a second, **add the connector again** and pick the
+other workspace — each connection registers separately, so they coexist, and
+each appears under the name of its workspace (`workel — Acme`) rather than as
+identical entries you can't tell apart.
+
+One thing to watch: **re-authorizing an existing connection moves it, it does
+not add.** Going through consent again on a connector you already added
+replaces its credential and disables the old one, so that connection switches
+to whichever workspace you pick. If you want both, add a new connector instead
+of re-authorizing the one you have.
+
+## Running it yourself
+
 This package is for the cases the hosted server doesn't cover: **Claude Code,
 CI agents, the OpenAI Agents SDK** — anywhere you want to run the process
 yourself and hold the credential. Everything below is about that.
+
+It handles multiple workspaces differently, and better for this use case: set
+[`WORKEL_API_KEYS`](#environment-variables) to a comma-separated list, one key per
+workspace, and every tool gains a `workspace` argument naming which one to act
+in. Nine tools stay nine tools however many workspaces you configure, rather
+than multiplying per workspace — which matters because every tool definition is
+context the model pays for on each turn.
 
 ## Mint a dedicated read-only key before you start
 

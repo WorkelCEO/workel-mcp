@@ -61,7 +61,7 @@ import * as http from 'node:http';
 import { createHash } from 'node:crypto';
 import { loadConfig } from './config';
 import { createWorkelApiClient, type FetchLike, type WorkelApiClient } from './api/client';
-import { defaultSleep } from './boot';
+import { defaultSleep, probeMe } from './boot';
 import { redactDeep } from './api/redact';
 import { buildServer, type ServerCaps } from './server';
 import { READ_TOOLS } from './tools';
@@ -330,6 +330,72 @@ function computeCaps(client: WorkelApiClient, tools: ToolFactory[]): ServerCaps 
   return { scopes: Array.from(scopes) };
 }
 
+/**
+ * True when the body is a JSON-RPC `initialize` call — the one message whose
+ * response carries `serverInfo.name` to the client.
+ *
+ * Deliberately total: any parse failure, batch, or other method returns false
+ * and the request proceeds unnamed. A malformed body is the transport's to
+ * reject with a proper JSON-RPC error, not this function's to throw on.
+ */
+function isInitialize(rawBody: Buffer): boolean {
+  try {
+    const parsed: unknown = JSON.parse(rawBody.toString('utf8'));
+    return (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      (parsed as { method?: unknown }).method === 'initialize'
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Longest workspace name we will put in `serverInfo.name`. */
+const MAX_DISPLAY_NAME_LENGTH = 40;
+
+/**
+ * `workel — <workspace>`, or `undefined` if the workspace cannot be
+ * determined.
+ *
+ * NEVER throws and never fails the request: the name is cosmetic, and a `/me`
+ * that is slow, rate-limited or down must degrade to the plain server name
+ * rather than break a session the caller is otherwise entitled to. A bearer
+ * that is simply invalid also lands here, and the real 401 is produced by the
+ * tool call that follows — this must not pre-empt it with a different error.
+ *
+ * The workspace name is USER-SUPPLIED, so it is sanitised before going into a
+ * protocol field: control characters stripped (they can break framing or smuggle
+ * escape sequences into a terminal client) and length capped.
+ */
+async function resolveDisplayName(
+  client: WorkelApiClient,
+  deps: RemoteHandlerDeps
+): Promise<string | undefined> {
+  try {
+    const me = await probeMe(client);
+    const raw = me.workspace?.name;
+    if (typeof raw !== 'string') return undefined;
+
+    // eslint-disable-next-line no-control-regex
+    const cleaned = raw.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (cleaned === '') return undefined;
+
+    const label =
+      cleaned.length > MAX_DISPLAY_NAME_LENGTH
+        ? `${cleaned.slice(0, MAX_DISPLAY_NAME_LENGTH - 1)}…`
+        : cleaned;
+
+    return `workel — ${label}`;
+  } catch (err) {
+    // Name only. Never the bearer, and never the upstream body.
+    log(deps.logger, 'info', 'remote.display_name_unavailable', {
+      reason: err instanceof Error ? err.name : 'unknown',
+    });
+    return undefined;
+  }
+}
+
 function collectResponseHeaders(webResponse: Response): Record<string, string> {
   const headers: Record<string, string> = {};
   webResponse.headers.forEach((value, key) => {
@@ -387,7 +453,25 @@ async function dispatch(
 
   const tools = toolsForRequest(deps.writesEnabled);
   const caps = computeCaps(client, tools);
-  const server = buildServer(client, caps, tools);
+
+  let rawBody: Buffer;
+  try {
+    rawBody = await readRawBody(req);
+  } catch (err) {
+    if (err instanceof RequestBodyTooLargeError) {
+      log(deps.logger, 'warn', 'remote.body_too_large', { limit: MAX_REQUEST_BODY_BYTES });
+      respond(413, { 'Content-Type': 'application/json' }, JSON.stringify(jsonRpcError(-32600, 'Request body too large')));
+      return;
+    }
+    throw err;
+  }
+
+  // Only the `initialize` handshake carries the server name to the client, so
+  // that is the only message worth spending a round trip to personalise. Tool
+  // calls skip this entirely and cost exactly what they did before — which is
+  // the whole reason `computeCaps` deliberately avoids probing `/me` too.
+  const displayName = isInitialize(rawBody) ? await resolveDisplayName(client, deps) : undefined;
+  const server = buildServer(client, caps, tools, displayName);
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -397,7 +481,6 @@ async function dispatch(
   try {
     await server.connect(transport);
 
-    const rawBody = await readRawBody(req);
     const webRequest = new Request(INTERNAL_REQUEST_URL, {
       method: 'POST',
       headers: {

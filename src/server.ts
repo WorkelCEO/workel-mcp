@@ -112,11 +112,16 @@ function workspaceArgSchema(labels: string[]): ZodTypeAny {
  * backstop — two loops would drift, and the security-relevant half is the one
  * that would drift silently.
  */
-export function buildServer(client: WorkelApiClient, caps: ServerCaps, tools: ToolFactory[] = []): McpServer {
+export function buildServer(
+  client: WorkelApiClient,
+  caps: ServerCaps,
+  tools: ToolFactory[] = [],
+  displayName?: string
+): McpServer {
   const registry = createWorkspaceRegistry([
     { id: 'default', name: 'default', keyName: 'default', scopes: caps.scopes, client },
   ]);
-  return buildWorkspaceServer(registry, tools);
+  return buildWorkspaceServer(registry, tools, displayName);
 }
 
 /**
@@ -132,8 +137,22 @@ export function buildServer(client: WorkelApiClient, caps: ServerCaps, tools: To
  * key: this multiplexes addressing, never authority. A request still carries
  * exactly one key, and the API's tenancy check is unchanged.
  */
-export function buildWorkspaceServer(registry: WorkspaceRegistry, tools: ToolFactory[] = []): McpServer {
-  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+export function buildWorkspaceServer(
+  registry: WorkspaceRegistry,
+  tools: ToolFactory[] = [],
+  displayName?: string
+): McpServer {
+  // `displayName` exists for the HOSTED connector, where one OAuth token
+  // resolves to exactly one workspace and a user may connect several. Each
+  // connection is a separate registered OAuth client, so they coexist — but
+  // they all reported the same static `workel`, leaving the user with N
+  // identical entries and no way to tell which workspace a call would hit.
+  // Reporting "workel — Acme" is the difference between that working in
+  // principle and being usable.
+  //
+  // Unset for stdio, which addresses multiple workspaces through the
+  // `workspace` tool argument instead and so has nothing to disambiguate.
+  const server = new McpServer({ name: displayName ?? SERVER_NAME, version: SERVER_VERSION });
   const registerTool = server.registerTool.bind(server) as unknown as RegisterToolMethod;
 
   for (const factory of tools) {
