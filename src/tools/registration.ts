@@ -39,21 +39,26 @@ import { workelCreateTask } from './createTask';
 import { workelUpdateTask } from './updateTask';
 import { workelCreateTaskComment } from './createComment';
 import { workelCreateEvent } from './createEvent';
+import { workelUploadTaskAttachment } from './uploadAttachment';
 import type { ToolFactory } from './defineTool';
 
 /**
  * Every write tool this server can ever expose — the write-side counterpart
  * of `./index`'s `READ_TOOLS`. Not every entry shares one scope:
  * `workelCreateTask`/`workelUpdateTask` declare `write:tasks`,
- * `workelCreateTaskComment` declares `write:comments`, and `workelCreateEvent`
- * declares `write:events` — each tool's own `scope` (not membership in this
+ * `workelCreateTaskComment` declares `write:comments`, `workelCreateEvent`
+ * declares `write:events`, and `workelUploadTaskAttachment` declares
+ * `write:attachments` — each tool's own `scope` (not membership in this
  * array) is what `buildServer`'s gate (a) checks per caller (`../server.ts`).
+ * That per-tool scoping is why the upload tool can sit here safely: a key
+ * holding `write:tasks` but not `write:attachments` never sees it.
  */
 export const WRITE_TOOLS: ToolFactory[] = [
   workelCreateTask,
   workelUpdateTask,
   workelCreateTaskComment,
   workelCreateEvent,
+  workelUploadTaskAttachment,
 ];
 
 /**

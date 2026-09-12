@@ -28,7 +28,7 @@ describe('server.ts has no direct environment or stdio access', () => {
 });
 
 function fakeClient(): WorkelApiClient {
-  return { get: jest.fn(), post: jest.fn(), patch: jest.fn() };
+  return { get: jest.fn(), post: jest.fn(), postFile: jest.fn(), patch: jest.fn() };
 }
 
 /** Reads the tool names `buildServer` actually registered, straight off the constructed server. */

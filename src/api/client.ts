@@ -109,8 +109,32 @@ export interface WorkelApiWriteOptions {
 export interface WorkelApiClient {
   get<T = unknown>(path: string, query?: QueryParams): Promise<WorkelApiResult<T>>;
   post<T = unknown>(path: string, body?: unknown, options?: WorkelApiWriteOptions): Promise<WorkelApiResult<T>>;
+  /**
+   * `multipart/form-data` POST — the upload path. Shares every behaviour
+   * `post` has (write queue, 429 retry, error mapping, replay detection,
+   * body-parse guard) and differs only in how the body is framed.
+   */
+  postFile<T = unknown>(
+    path: string,
+    file: UploadPart,
+    options?: WorkelApiWriteOptions
+  ): Promise<WorkelApiResult<T>>;
   /** Never carries `Idempotency-Key` — see the file-level docblock. */
   patch<T = unknown>(path: string, body?: unknown): Promise<WorkelApiResult<T>>;
+}
+
+/**
+ * One file part of a multipart upload.
+ *
+ * `fieldName` defaults to `file`, which is what every current upload route
+ * expects; it is a parameter rather than a constant so a future endpoint
+ * naming its part differently does not need a second client method.
+ */
+export interface UploadPart {
+  fieldName?: string;
+  fileName: string;
+  bytes: Uint8Array;
+  contentType?: string;
 }
 
 /** A 429 is retried at most once, and only after waiting this long — never more, regardless of what `Retry-After` asked for. */
@@ -396,18 +420,58 @@ export function createWorkelApiClient(deps: WorkelApiClientDeps): WorkelApiClien
     body: unknown,
     idempotencyKey: string | null
   ): Promise<WorkelApiResult<T>> {
-    const url = buildRequestUrl(baseUrl, path);
     const hasBody = body !== undefined;
 
     const headers: Record<string, string> = { ...requestHeaders };
     if (hasBody) headers['Content-Type'] = 'application/json';
     if (idempotencyKey !== null) headers['Idempotency-Key'] = idempotencyKey;
 
-    const response = await fetchWithRetry(url, {
-      method,
-      headers,
-      body: hasBody ? JSON.stringify(body) : undefined,
+    return sendWrite<T>(method, path, headers, hasBody ? JSON.stringify(body) : undefined);
+  }
+
+  /**
+   * The multipart sibling of performWrite.
+   *
+   * Content-Type is deliberately NOT set: `fetch` derives it from the
+   * FormData body, and the value it derives carries the multipart BOUNDARY.
+   * Setting it by hand — the reflex, since every other write here sets it —
+   * produces a header with no boundary, which the server cannot parse; PHP
+   * then reports zero fields and zero files and the endpoint 422s on a
+   * "missing" file that was in fact sent. (The web app hit exactly this:
+   * CLAUDE.md §57.3.)
+   */
+  async function performMultipartWrite<T>(
+    path: string,
+    file: UploadPart,
+    idempotencyKey: string | null
+  ): Promise<WorkelApiResult<T>> {
+    const headers: Record<string, string> = { ...requestHeaders };
+    if (idempotencyKey !== null) headers['Idempotency-Key'] = idempotencyKey;
+
+    const form = new FormData();
+    // `bytes.slice()` hands Blob a plain ArrayBuffer of exactly this view's
+    // range — a Uint8Array over a larger/pooled buffer would otherwise
+    // contribute the WHOLE buffer to the part.
+    const blob = new Blob([file.bytes.slice()], {
+      type: file.contentType ?? 'application/octet-stream',
     });
+    form.append(file.fieldName ?? 'file', blob, file.fileName);
+
+    return sendWrite<T>('POST', path, headers, form);
+  }
+
+  async function sendWrite<T>(
+    method: 'POST' | 'PATCH',
+    path: string,
+    headers: Record<string, string>,
+    // Not `BodyInit`: that type ships with the DOM lib, and this project
+    // compiles against lib ES2020 + @types/node. The union is exactly what
+    // the two callers pass.
+    body: string | FormData | undefined
+  ): Promise<WorkelApiResult<T>> {
+    const url = buildRequestUrl(baseUrl, path);
+
+    const response = await fetchWithRetry(url, { method, headers, body });
 
     if (!response.ok) {
       return throwMappedError(response);
@@ -440,13 +504,25 @@ export function createWorkelApiClient(deps: WorkelApiClientDeps): WorkelApiClien
     return enqueueWrite(() => performWrite<T>('POST', path, body, idempotencyKey));
   }
 
+  async function postFile<T = unknown>(
+    path: string,
+    file: UploadPart,
+    options?: WorkelApiWriteOptions
+  ): Promise<WorkelApiResult<T>> {
+    // Same one-key-per-logical-call rule as post(): generated above the
+    // retry loop so a retried attempt reuses it unchanged. It matters more
+    // here — a retried upload without a stable key stores the file twice.
+    const idempotencyKey = options?.idempotencyKey ?? randomUUID();
+    return enqueueWrite(() => performMultipartWrite<T>(path, file, idempotencyKey));
+  }
+
   async function patch<T = unknown>(path: string, body?: unknown): Promise<WorkelApiResult<T>> {
     // Never carries Idempotency-Key: PublicApiIdempotency::handle() only
     // inspects POST (PublicApiIdempotency.php:65-67).
     return enqueueWrite(() => performWrite<T>('PATCH', path, body, null));
   }
 
-  return { get, post, patch };
+  return { get, post, postFile, patch };
 }
 
 function defaultSleep(ms: number): Promise<void> {

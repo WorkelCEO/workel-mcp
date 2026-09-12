@@ -14,7 +14,7 @@ import { READ_TOOLS, UNTRUSTED_CONTENT_NOTE } from './tools/index';
 import type { ToolDescriptor } from './tools/defineTool';
 
 function fakeClient(): WorkelApiClient {
-  return { get: jest.fn(), post: jest.fn(), patch: jest.fn() };
+  return { get: jest.fn(), post: jest.fn(), postFile: jest.fn(), patch: jest.fn() };
 }
 
 /** The live registry, resolved to descriptors — never a hand-copied list of names. */

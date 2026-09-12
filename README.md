@@ -175,23 +175,27 @@ include the scope listed. List tools return 25 results per call by default
 
 ### Write tools
 
-Four, and they register only when **both** gates pass: the key carries the
+Five, and they register only when **both** gates pass: the key carries the
 matching `write:*` scope **and** `WORKEL_ENABLE_WRITES=true` is set. Either
 one alone registers nothing, so a read-only install never sees them.
 
 | Tool | Scope | What it does |
 |---|---|---|
 | `workel_create_task` | `write:tasks` | Create a task, placed by either `column_id` or `project_id` — exactly one, never both. |
-| `workel_update_task` | `write:tasks` | Update fields on an existing task, including moving it to another column (`column_id`, which may belong to a different project) and reassigning it (`assignee_ids`, which **replaces** the set rather than adding to it). Cover image and attachments are readable but not writable — they are file uploads. |
+| `workel_update_task` | `write:tasks` | Update fields on an existing task, including moving it to another column (`column_id`, which may belong to a different project) and reassigning it (`assignee_ids`, which **replaces** the set rather than adding to it). Cover image and attachments are not writable here — use `workel_upload_task_attachment` for files; there is no way to set a cover image over this API. |
 | `workel_create_task_comment` | `write:comments` | Add a plain-text comment to a task. No @-mentions; the API rejects the request outright if a mention field is sent. |
 | `workel_create_event` | `write:events` | Create a calendar event. `repeat_interval` is required whenever `repeat` is anything but `none`. |
+| `workel_upload_task_attachment` | `write:attachments` | Attach a file to a task by passing its **content** (there is no path argument — an MCP server may not share a filesystem with the caller). Text by default; `encoding: "base64"` for small binaries. Uploads count against the workspace's storage plan, and script-bearing types (`.html`, `.svg`, `.js`, …) are refused. |
 
 No tool deletes anything. `workel_update_task` is annotated
 `destructiveHint: true`, so a client that honours annotations prompts before
 each call; the read tools are annotated read-only and run without one.
 
 The hosted server at `mcp.workel.com` runs with writes enabled, so all
-thirteen tools are available there.
+fifteen tools are available there — subject to the scopes the connected key
+actually holds. `write:attachments` is a distinct scope from `write:tasks`, so
+a connection authorized before the upload tool existed does not carry it and
+will not be offered that tool until it is re-authorized.
 
 ## Limitations
 
