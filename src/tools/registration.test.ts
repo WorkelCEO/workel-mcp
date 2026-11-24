@@ -22,7 +22,7 @@ describe('WRITE_TOOLS registry', () => {
   // The exhaustive list matters more than its length: a tool that mutates
   // workspace data but is missing here would never pass through the D5
   // double opt-in, so it would register on a read-only install.
-  it('contains exactly the five write tools — no more, no fewer', () => {
+  it('contains exactly the six write tools — no more, no fewer', () => {
     const names = WRITE_TOOLS.map((factory) => factory(fakeClient()).name);
 
     expect(new Set(names)).toEqual(
@@ -32,9 +32,10 @@ describe('WRITE_TOOLS registry', () => {
         'workel_create_task_comment',
         'workel_create_event',
         'workel_upload_task_attachment',
+        'workel_log_time',
       ])
     );
-    expect(names).toHaveLength(5);
+    expect(names).toHaveLength(6);
   });
 
   it('every write tool declares a write:* scope, matching its endpoint', () => {
@@ -44,6 +45,7 @@ describe('WRITE_TOOLS registry', () => {
       workel_create_task_comment: 'write:comments',
       workel_create_event: 'write:events',
       workel_upload_task_attachment: 'write:attachments',
+      workel_log_time: 'write:time',
     };
 
     for (const factory of WRITE_TOOLS) {

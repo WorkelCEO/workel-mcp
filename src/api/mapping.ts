@@ -43,6 +43,7 @@ import type {
   Task,
   TaskComment,
   TaskCommentAuthor,
+  TimeEntry,
   WireCard,
   WireTaskActivity,
   WireTaskAttachment,
@@ -54,6 +55,7 @@ import type {
   WireTask,
   WireTaskComment,
   WireTaskCommentAuthor,
+  WireTimeEntry,
 } from './types';
 
 /**
@@ -437,5 +439,27 @@ export function mapEventFromWire(event: WireEvent): Event {
     repeat: event.repeat,
     created_at: event.created_at,
     updated_at: event.updated_at,
+  };
+}
+
+/**
+ * A time entry, field for field. `user` is `{id, name}` only, as everywhere on
+ * this surface; `note` is passed through and bounded by the tool that shows it.
+ */
+export function mapTimeEntryFromWire(entry: WireTimeEntry): TimeEntry {
+  return {
+    id: entry.id,
+    task_id: entry.task_id,
+    project_id: entry.project_id,
+    user: entry.user ? { id: entry.user.id, name: entry.user.name } : null,
+    started_at: entry.started_at,
+    ended_at: entry.ended_at,
+    duration_seconds: entry.duration_seconds,
+    running: entry.running,
+    billable: entry.billable,
+    note: entry.note,
+    source: entry.source,
+    created_at: entry.created_at,
+    updated_at: entry.updated_at,
   };
 }

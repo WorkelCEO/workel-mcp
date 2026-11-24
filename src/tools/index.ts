@@ -20,6 +20,7 @@ import { workelListTasks, workelGetTask } from './workel_tasks';
 import { workelListTaskComments } from './workel_task_comments';
 import { workelListTaskActivity } from './workel_task_activity';
 import { workelListEvents } from './workel_events';
+import { workelListTimeEntries } from './workel_time_entries';
 
 export const READ_TOOLS: ToolFactory[] = [
   workelWhoami,
@@ -32,6 +33,7 @@ export const READ_TOOLS: ToolFactory[] = [
   workelListTaskComments,
   workelListTaskActivity,
   workelListEvents,
+  workelListTimeEntries,
 ];
 
 export * from './conventions';
