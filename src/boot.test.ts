@@ -24,6 +24,9 @@ const ALL_TEN_TOOLS = [
   'workel_list_members',
   'workel_list_events',
 ].sort();
+// With the startup check skipped there are no scopes to filter by, so every
+// read tool registers, including the ones the four scopes above do not reach.
+const EVERY_READ_TOOL = [...ALL_TEN_TOOLS, 'workel_list_time_entries'].sort();
 
 function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), { status, headers });
@@ -230,7 +233,7 @@ describe('boot: base URL is reported only when non-default', () => {
 });
 
 describe('boot: WORKEL_SKIP_STARTUP_CHECK', () => {
-  it('never calls fetch, registers all ten tools, and states that scopes were not probed', async () => {
+  it('never calls fetch, registers every read tool, and states that scopes were not probed', async () => {
     const fetchMock = jest.fn().mockRejectedValue(new Error('fetch must not be called when the check is skipped'));
     const { deps, stdout, stderr, exit } = makeHarness(
       { WORKEL_API_KEY: API_KEY, WORKEL_SKIP_STARTUP_CHECK: 'true' },
@@ -241,7 +244,7 @@ describe('boot: WORKEL_SKIP_STARTUP_CHECK', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(exit).not.toHaveBeenCalled();
-    expect(result!.toolNames.sort()).toEqual(ALL_TEN_TOOLS);
+    expect(result!.toolNames.sort()).toEqual(EVERY_READ_TOOL);
     expect(stderr).toHaveBeenCalledTimes(1);
     const line = stderr.mock.calls[0][0] as string;
     expectExactlyOneLine(line);

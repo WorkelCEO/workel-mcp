@@ -40,6 +40,7 @@ import { workelUpdateTask } from './updateTask';
 import { workelCreateTaskComment } from './createComment';
 import { workelCreateEvent } from './createEvent';
 import { workelUploadTaskAttachment } from './uploadAttachment';
+import { workelLogTime } from './logTime';
 import type { ToolFactory } from './defineTool';
 
 /**
@@ -59,6 +60,7 @@ export const WRITE_TOOLS: ToolFactory[] = [
   workelCreateTaskComment,
   workelCreateEvent,
   workelUploadTaskAttachment,
+  workelLogTime,
 ];
 
 /**

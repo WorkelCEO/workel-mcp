@@ -27,7 +27,7 @@
     "workel_api_key": {
       "type": "string",
       "title": "Workel API key",
-      "description": "A Workel API key minted in Workel \u2192 Settings \u2192 Developers. Grant only the read:* scopes this server's tools use (read:projects, read:tasks, read:members, read:events) \u2014 see the package README's tool table for exactly which tool needs which scope. Never reuse a key another integration already holds.",
+      "description": "A Workel API key minted in Workel \u2192 Settings \u2192 Developers. Grant only the read:* scopes this server's tools use (read:projects, read:tasks, read:members, read:events, read:time) \u2014 see the package README's tool table for exactly which tool needs which scope. Never reuse a key another integration already holds.",
       "sensitive": true,
       "required": true
     }

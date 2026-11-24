@@ -362,3 +362,54 @@ export interface WireCursorPage<T> {
 export interface WireItem<T> {
   data: T;
 }
+
+// ---------------------------------------------------------------------------
+// Time entries (`read:time` / `write:time`)
+//
+// One block of time someone tracked on a task: a timer they ran, or time they
+// logged by hand. A running timer has `ended_at` and `duration_seconds` null
+// and `running` true. `project_id` is the task's project today (a task can
+// move). `note` is the tracker's own free text.
+// spec: backend/services/laravel-backend/app/Http/Resources/PublicApi/V1/TimeEntryResource.php
+// ---------------------------------------------------------------------------
+
+export interface WireTimeEntry {
+  id: string;
+  task_id: string;
+  project_id: string | null;
+  user: WireTaskAttachmentUploader | null;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  running: boolean;
+  billable: boolean;
+  note: string | null;
+  source: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface TimeEntry {
+  id: string;
+  task_id: string;
+  project_id: string | null;
+  user: TaskAttachmentUploader | null;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  running: boolean;
+  billable: boolean;
+  note: string | null;
+  source: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+/** The body `POST /time-entries` accepts. */
+export interface WireCreateTimeEntry {
+  task_id: string;
+  duration_seconds: number;
+  started_at?: string;
+  note?: string;
+  billable?: boolean;
+}
